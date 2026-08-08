@@ -1,0 +1,1 @@
+"""CalmWay FastAPI application package."""
