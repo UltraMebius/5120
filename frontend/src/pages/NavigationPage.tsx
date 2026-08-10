@@ -36,8 +36,7 @@ function NavigationPage() {
     instruction: "Continue along the selected walking route",
     maneuverLocation: null,
   };
-  const mapOrigin =
-    journey.origin?.source === "MAPBOX" ? journey.origin : null;
+  const mapOrigin = journey.origin;
   const mapDestination =
     journey.destination.source === "MAPBOX" ? journey.destination : null;
 

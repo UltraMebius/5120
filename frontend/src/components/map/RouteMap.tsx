@@ -7,6 +7,7 @@ import {
 } from "../../services/mapbox";
 import type {
   GeoJsonLineString,
+  JourneyLocation,
   MapboxJourneyLocation,
   WalkingRoute,
 } from "../../types/route";
@@ -22,7 +23,7 @@ type RouteCoordinate = [longitude: number, latitude: number];
 
 interface RouteMapProps {
   destination: MapboxJourneyLocation | null;
-  origin: MapboxJourneyLocation | null;
+  origin: JourneyLocation | null;
   route: WalkingRoute;
   variant: RouteMapVariant;
 }
@@ -58,7 +59,7 @@ function isValidCoordinate(value: unknown): value is RouteCoordinate {
 }
 
 function createVisualisation(
-  origin: MapboxJourneyLocation | null,
+  origin: JourneyLocation | null,
   destination: MapboxJourneyLocation | null,
   route: WalkingRoute,
 ): RouteVisualisation | null {

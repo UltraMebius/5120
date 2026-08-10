@@ -14,7 +14,10 @@ import {
   suggestMapboxPlaces,
   type MapboxSearchSuggestion,
 } from "../../services/mapbox";
-import type { MapboxSelectedLocation } from "../../types/route";
+import type {
+  JourneyLocation,
+  MapboxSelectedLocation,
+} from "../../types/route";
 
 interface LocationSearchFieldProps {
   error?: string;
@@ -24,7 +27,7 @@ interface LocationSearchFieldProps {
   onSelect: (location: MapboxSelectedLocation) => void;
   onTextChange: (value: string) => void;
   placeholder: string;
-  selectedLocation: MapboxSelectedLocation | null;
+  selectedLocation: JourneyLocation | null;
   status?: string | null;
   value: string;
 }
@@ -36,6 +39,12 @@ function suggestionSecondaryText(suggestion: MapboxSearchSuggestion): string {
       .filter((part): part is string => Boolean(part))
       .join(", ")
   );
+}
+
+function selectedLocationDescription(location: JourneyLocation): string {
+  return location.source === "MAPBOX"
+    ? location.fullAddress
+    : location.label;
 }
 
 function isAbortError(error: unknown): boolean {
@@ -338,7 +347,7 @@ function LocationSearchField({
       )}
 
       {error && (
-        <p className="field-error" id={errorId}>
+        <p className="field-error" id={errorId} role="alert">
           {error}
         </p>
       )}
@@ -355,7 +364,7 @@ function LocationSearchField({
 
       {selectedLocation && (
         <p className="field-status field-status--selected" id={selectionId}>
-          Selected: {selectedLocation.fullAddress}
+          Selected: {selectedLocationDescription(selectedLocation)}
         </p>
       )}
 

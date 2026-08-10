@@ -41,7 +41,7 @@ function RouteSearchPage() {
             Compare real walking routes using current crowd coverage and your
             selected tolerance.
           </p>
-          <span className="phase-pill">Epic 1 · Phase 4 route ranking</span>
+          <span className="phase-pill">Epic 1 · Phase 5A current origin</span>
         </section>
 
         {error && (

@@ -1,8 +1,11 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 
+import {
+  geolocationErrorMessage,
+  getCurrentJourneyLocation,
+} from "../../services/geolocation";
 import type { CrowdPreference } from "../../types/crowd";
 import type {
-  Coordinate,
   JourneyLocation,
   MapboxJourneyLocation,
   MapboxSelectedLocation,
@@ -29,24 +32,8 @@ interface FormErrors {
 }
 
 interface LocationFieldState {
-  selectedLocation: MapboxSelectedLocation | null;
+  selectedLocation: JourneyLocation | null;
   text: string;
-}
-
-function selectedLocationFromJourney(
-  location?: JourneyLocation | null,
-): MapboxSelectedLocation | null {
-  if (!location || location.source !== "MAPBOX") {
-    return null;
-  }
-
-  return {
-    fullAddress: location.fullAddress,
-    latitude: location.latitude,
-    longitude: location.longitude,
-    mapboxId: location.mapboxId,
-    name: location.name,
-  };
 }
 
 function journeyLocationFromSelection(
@@ -68,56 +55,47 @@ function RouteSearchForm({
   onSearch,
 }: RouteSearchFormProps) {
   const [origin, setOrigin] = useState<LocationFieldState>({
-    selectedLocation: selectedLocationFromJourney(initialOrigin),
+    selectedLocation: initialOrigin ?? null,
     text: initialOrigin?.label ?? "",
   });
   const [destination, setDestination] = useState<LocationFieldState>({
-    selectedLocation: selectedLocationFromJourney(initialDestination),
+    selectedLocation: initialDestination ?? null,
     text: initialDestination?.label ?? "",
   });
-  const [originCoordinates, setOriginCoordinates] = useState<
-    Coordinate | undefined
-  >(
-    initialOrigin?.source === "CURRENT_LOCATION"
-      ? initialOrigin.coordinates
-      : undefined,
-  );
   const [preference, setPreference] =
     useState<CrowdPreference>(initialPreference);
   const [errors, setErrors] = useState<FormErrors>({});
+  const [locationError, setLocationError] = useState<string | null>(null);
   const [locationStatus, setLocationStatus] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
+  const isLocatingRef = useRef(false);
 
-  function useCurrentLocation() {
-    if (!navigator.geolocation) {
-      setLocationStatus("Current location is not supported by this browser.");
+  async function useCurrentLocation() {
+    if (isLocatingRef.current) {
       return;
     }
 
+    isLocatingRef.current = true;
     setIsLocating(true);
+    setLocationError(null);
     setLocationStatus("Requesting your current location...");
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setOrigin({ selectedLocation: null, text: "Current location" });
-        setOriginCoordinates({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        });
-        onDraftLocationChange("origin", null);
-        setErrors((current) => ({ ...current, origin: undefined }));
-        setLocationStatus(
-          "Current location is available, but Phase 3A submission still requires a Mapbox place selection.",
-        );
-        setIsLocating(false);
-      },
-      () => {
-        setLocationStatus(
-          "We could not access your location. Enter an origin instead.",
-        );
-        setIsLocating(false);
-      },
-      { enableHighAccuracy: false, maximumAge: 60_000, timeout: 10_000 },
-    );
+
+    try {
+      const currentLocation = await getCurrentJourneyLocation();
+      setOrigin({
+        selectedLocation: currentLocation,
+        text: currentLocation.label,
+      });
+      onDraftLocationChange("origin", currentLocation);
+      setErrors((current) => ({ ...current, origin: undefined }));
+      setLocationStatus("Current location selected.");
+    } catch (error: unknown) {
+      setLocationError(geolocationErrorMessage(error));
+      setLocationStatus(null);
+    } finally {
+      isLocatingRef.current = false;
+      setIsLocating(false);
+    }
   }
 
   function changeOriginText(text: string) {
@@ -125,7 +103,7 @@ function RouteSearchForm({
       onDraftLocationChange("origin", null);
     }
     setOrigin({ selectedLocation: null, text });
-    setOriginCoordinates(undefined);
+    setLocationError(null);
     setLocationStatus(null);
     if (errors.origin) {
       setErrors((current) => ({ ...current, origin: undefined }));
@@ -143,20 +121,19 @@ function RouteSearchForm({
   }
 
   function selectOrigin(location: MapboxSelectedLocation) {
-    setOrigin({ selectedLocation: location, text: location.name });
-    setOriginCoordinates(undefined);
+    const journeyLocation = journeyLocationFromSelection(location);
+    setOrigin({ selectedLocation: journeyLocation, text: location.name });
+    setLocationError(null);
     setLocationStatus(null);
     setErrors((current) => ({ ...current, origin: undefined }));
-    onDraftLocationChange("origin", journeyLocationFromSelection(location));
+    onDraftLocationChange("origin", journeyLocation);
   }
 
   function selectDestination(location: MapboxSelectedLocation) {
-    setDestination({ selectedLocation: location, text: location.name });
+    const journeyLocation = journeyLocationFromSelection(location);
+    setDestination({ selectedLocation: journeyLocation, text: location.name });
     setErrors((current) => ({ ...current, destination: undefined }));
-    onDraftLocationChange(
-      "destination",
-      journeyLocationFromSelection(location),
-    );
+    onDraftLocationChange("destination", journeyLocation);
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -175,7 +152,7 @@ function RouteSearchForm({
 
     if (!trimmedDestination) {
       nextErrors.destination = "Destination is required.";
-    } else if (!destination.selectedLocation) {
+    } else if (destination.selectedLocation?.source !== "MAPBOX") {
       nextErrors.destination =
         "Select a destination from the Mapbox suggestions.";
     }
@@ -186,16 +163,14 @@ function RouteSearchForm({
       nextErrors.origin ||
       nextErrors.destination ||
       !origin.selectedLocation ||
-      !destination.selectedLocation
+      destination.selectedLocation?.source !== "MAPBOX"
     ) {
       return;
     }
 
     void onSearch({
-      destination: journeyLocationFromSelection(
-        destination.selectedLocation,
-      ),
-      origin: journeyLocationFromSelection(origin.selectedLocation),
+      destination: destination.selectedLocation,
+      origin: origin.selectedLocation,
       preference,
     });
   }
@@ -210,14 +185,15 @@ function RouteSearchForm({
         </div>
 
         <LocationSearchField
-          error={errors.origin}
+          error={locationError ?? errors.origin}
           id="origin"
           label="Starting point"
           labelAction={
             <button
               className="text-button"
               disabled={isLocating}
-              onClick={useCurrentLocation}
+              aria-busy={isLocating}
+              onClick={() => void useCurrentLocation()}
               type="button"
             >
               <span aria-hidden="true">◎</span>{" "}
@@ -245,8 +221,9 @@ function RouteSearchForm({
       </div>
 
       <p className="integration-note">
-        Select both places from Mapbox suggestions. CalmWay will request real
-        walking routes through its backend; crowd ranking is not connected yet.
+        Use your current location or select a Mapbox starting point. Destination
+        must be selected from Mapbox suggestions before CalmWay requests and
+        evaluates real walking routes.
       </p>
 
       <CrowdPreferenceSelector onChange={setPreference} value={preference} />
@@ -258,7 +235,7 @@ function RouteSearchForm({
 
       <button
         className="button button--primary button--large"
-        disabled={isLoading}
+        disabled={isLoading || isLocating}
         type="submit"
       >
         {isLoading ? "Loading walking routes..." : "Find walking routes"}

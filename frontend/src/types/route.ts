@@ -33,13 +33,15 @@ export interface MapboxJourneyLocation extends MapboxSelectedLocation {
   source: "MAPBOX";
 }
 
-export interface LegacyJourneyLocation {
-  coordinates?: Coordinate;
-  label: string;
-  source: "CURRENT_LOCATION" | "MANUAL";
+export interface GeolocationJourneyLocation extends Coordinate {
+  label: "Current location";
+  name: "Current location";
+  source: "GEOLOCATION";
 }
 
-export type JourneyLocation = MapboxJourneyLocation | LegacyJourneyLocation;
+export type JourneyLocation =
+  | GeolocationJourneyLocation
+  | MapboxJourneyLocation;
 
 export interface GeoJsonLineString {
   coordinates: [longitude: number, latitude: number][];
@@ -90,6 +92,6 @@ export interface WalkingRoutesResult {
 
 export interface WalkingRouteSearchRequest {
   destination: MapboxJourneyLocation;
-  origin: MapboxJourneyLocation;
+  origin: JourneyLocation;
   preference: CrowdPreference;
 }

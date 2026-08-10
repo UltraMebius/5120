@@ -1,10 +1,11 @@
 # CalmWay
 
 CalmWay is a responsive walking-route web application for sensory-sensitive
-commuters in Melbourne CBD. The project has completed **Epic 1 Phase 4**. The
-frontend can search for real Mapbox places, request real walking candidates from
-the FastAPI backend, preview each returned LineString on Mapbox GL JS, and reuse
-the selected route on the static Navigation screen. The backend now measures
+commuters in Melbourne CBD. The project has completed **Epic 1 Phase 5A**. The
+frontend can use a one-shot browser geolocation or search for a real Mapbox
+starting point, request real walking candidates from the FastAPI backend,
+preview each returned LineString on Mapbox GL JS, and reuse the selected route
+on the static Navigation screen. The backend measures
 and uniformly samples those LineStrings at the configured interval, evaluates
 each sample with the Phase 2D crowd point engine, then applies the project-
 approved coverage, P75, preference, and deterministic ranking policy.
@@ -32,11 +33,12 @@ The root route temporarily redirects to Route Search. The Home page belongs to
 another team member; `VITE_HOME_ROUTE` is the integration boundary and no Home
 page is implemented here.
 
-## Implemented through Phase 4
+## Implemented through Phase 5A
 
 - React Router page structure and a small Journey Context;
 - responsive desktop/mobile UI for the complete Epic 1 flow;
 - Mapbox Search Box place/POI selection with structured coordinates;
+- one-shot browser geolocation as an honest, in-memory structured route origin;
 - single-select LOW/MEDIUM/HIGH crowd preference UI;
 - real Mapbox Directions walking candidates through `POST /api/v1/routes/walking`;
 - route cards supporting the actual returned candidate count;
@@ -123,6 +125,9 @@ PostGIS testing, and real current-state verification. The [Phase 4 route-ranking
 decision record](docs/phase4-route-ranking-decisions.md) documents coverage,
 continuous P75, tolerance, deterministic tie-breaks, insufficient-data behavior,
 backend recommendation ownership, and reproduction commands.
+The [Phase 5A geolocation-origin guide](docs/geolocation-origin-phase5a-cn.md)
+documents the one-shot permission flow, source model, privacy boundary, HTTPS
+requirement, and real/simulated browser checks.
 
 Use Node.js 20 or newer for the frontend and Python 3.12 (or another compatible
 modern Python 3 release) for the backend.
