@@ -70,9 +70,56 @@ database_operation=<static_operation> db_exception_type=<class>
 ```
 
 `database_operation` 只使用代码内的静态名称。仅当类型是 `IntegrityError`
-且驱动提供合法 PostgreSQL SQLSTATE 时，该行可以追加五字符
-`sqlstate=<code>`。日志不记录 exception message、traceback、SQL、参数、
-raw record、连接串、Authorization header 或任何 secret。
+或 `ProgrammingError`，且驱动提供合法 PostgreSQL SQLSTATE 时，该行可以追加
+五字符 `sqlstate=<code>`。日志不记录 exception message、traceback、SQL、
+参数、raw record、连接串、Authorization header 或任何 secret。
+
+若生产日志定位到 `count_minute_conflict_groups` 的 `ProgrammingError`，可在
+Neon SQL Editor 执行以下只读检查。它不会创建或修改对象，也不会读取 raw
+业务行：
+
+```sql
+SELECT
+    to_regclass('public.pedestrian_minute_observation_raw') AS raw_table,
+    to_regclass('public.v_minute_conflict_groups') AS conflict_view;
+
+SELECT
+    table_name,
+    ordinal_position,
+    column_name,
+    data_type,
+    is_nullable
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name IN (
+      'pedestrian_minute_observation_raw',
+      'v_minute_conflict_groups'
+  )
+ORDER BY table_name, ordinal_position;
+
+SELECT pg_get_viewdef(
+    to_regclass('public.v_minute_conflict_groups'),
+    true
+) AS conflict_view_definition;
+
+SELECT
+    has_table_privilege(
+        current_user,
+        'public.pedestrian_minute_observation_raw',
+        'SELECT'
+    ) AS can_select_raw,
+    CASE
+        WHEN to_regclass('public.v_minute_conflict_groups') IS NULL THEN NULL
+        ELSE has_table_privilege(
+            current_user,
+            to_regclass('public.v_minute_conflict_groups'),
+            'SELECT'
+        )
+    END AS can_select_conflict_view;
+```
+
+权限结果对应 SQL Editor 的当前角色；若它与 Vercel `DATABASE_URL` 的角色不同，
+应使用相同应用角色再核对权限。
 
 刷新内的数据库 checkout 全部按顺序完成：每个 repository 的
 `connect()/begin()` 离开 context 后，下一步才申请连接。因此 Vercel 的单连接

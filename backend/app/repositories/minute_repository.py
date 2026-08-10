@@ -25,7 +25,7 @@ from sqlalchemy import (
     update,
 )
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, ProgrammingError, SQLAlchemyError
 
 from ..db.connection import get_database_engine
 from ..db.exceptions import DatabaseQueryError, DatabaseWriteError
@@ -67,10 +67,10 @@ _minute = Table(
 )
 
 
-def _integrity_sqlstate(error: SQLAlchemyError) -> str | None:
-    """Return only a validated PostgreSQL SQLSTATE for an integrity failure."""
+def _safe_sqlstate(error: SQLAlchemyError) -> str | None:
+    """Return only a validated SQLSTATE for an allowed DB error class."""
 
-    if not isinstance(error, IntegrityError):
+    if not isinstance(error, (IntegrityError, ProgrammingError)):
         return None
     original = getattr(error, "orig", None)
     for attribute in ("sqlstate", "pgcode"):
@@ -94,7 +94,7 @@ def _log_database_write_failure(
     """Log a bounded operation/type diagnostic without DB error contents."""
 
     exception_type = type(error).__name__
-    sqlstate = _integrity_sqlstate(error)
+    sqlstate = _safe_sqlstate(error)
     if sqlstate is None:
         _LOGGER.error(
             "database_operation=%s db_exception_type=%s",

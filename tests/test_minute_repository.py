@@ -3,7 +3,7 @@ import logging
 from unittest.mock import MagicMock
 
 import pytest
-from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
 
 from backend.app.db.exceptions import DatabaseWriteError
 from backend.app.models.minute import MinuteObservation
@@ -99,6 +99,46 @@ def test_non_integrity_error_does_not_log_driver_sqlstate_or_contents(
         "db_exception_type=OperationalError"
     ]
     assert "sqlstate=" not in caplog.text
+    assert PRIVATE_DETAIL not in caplog.text
+    assert "private SQL statement" not in caplog.text
+    assert caplog.records[0].exc_info is None
+
+
+def test_conflict_count_programming_error_logs_safe_sqlstate_only(
+    caplog,
+) -> None:
+    engine = MagicMock()
+    connection = engine.begin.return_value.__enter__.return_value
+    known_ids = MagicMock()
+    known_ids.scalars.return_value = (1,)
+    run_insert = MagicMock()
+    run_insert.scalar_one.return_value = 7
+    raw_insert = MagicMock()
+    raw_insert.scalars.return_value = (_observation().payload_hash,)
+    error = ProgrammingError(
+        "private SQL statement",
+        {"private_parameter": PRIVATE_DETAIL},
+        _DriverFailure(sqlstate="42P01"),
+    )
+    connection.execute.side_effect = (
+        known_ids,
+        run_insert,
+        raw_insert,
+        error,
+    )
+    repository = MinuteRepository(engine)
+
+    with caplog.at_level(
+        logging.ERROR,
+        logger="backend.app.repositories.minute_repository",
+    ):
+        with pytest.raises(DatabaseWriteError):
+            _ingest(repository)
+
+    assert caplog.messages == [
+        "database_operation=count_minute_conflict_groups "
+        "db_exception_type=ProgrammingError sqlstate=42P01"
+    ]
     assert PRIVATE_DETAIL not in caplog.text
     assert "private SQL statement" not in caplog.text
     assert caplog.records[0].exc_info is None
