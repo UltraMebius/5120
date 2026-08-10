@@ -1,0 +1,32 @@
+name: Refresh current activity
+
+on:
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+      timezone: "Australia/Melbourne"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: calmway-current-activity-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Refresh production current activity
+        env:
+          CALMWAY_REFRESH_SECRET: ${{ secrets.CALMWAY_REFRESH_SECRET }}
+        run: |
+          curl \
+            --fail-with-body \
+            --silent \
+            --show-error \
+            --max-time 180 \
+            --request POST \
+            --header "Authorization: Bearer ${CALMWAY_REFRESH_SECRET}" \
+            "https://calmway-backend.vercel.app/api/v1/internal/refresh-current-activity"
