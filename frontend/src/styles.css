@@ -298,6 +298,100 @@ input[aria-invalid="true"] {
   border-color: #ba5b54;
 }
 
+.location-search {
+  position: relative;
+}
+
+.location-search__control {
+  position: relative;
+}
+
+.location-search__control input {
+  padding-right: 68px;
+}
+
+.location-search__clear {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  padding: 5px;
+  border: 0;
+  color: var(--brand);
+  background: transparent;
+  font-size: 0.75rem;
+  font-weight: 800;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.location-search__clear:focus-visible {
+  border-radius: 5px;
+  outline: 3px solid #8fc8b7;
+  outline-offset: 1px;
+}
+
+.location-search__suggestions {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 3px);
+  right: 0;
+  left: 0;
+  overflow: hidden;
+  margin: 0;
+  padding: 5px;
+  border: 1px solid #c7d6d0;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 14px 30px rgb(37 64 56 / 16%);
+  list-style: none;
+}
+
+.location-search__suggestion {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  padding: 10px 11px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--ink);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.location-search__suggestion:hover,
+.location-search__suggestion--active {
+  background: #eef7f3;
+}
+
+.location-search__suggestion strong,
+.location-search__suggestion span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.location-search__suggestion strong {
+  color: #253d36;
+  font-size: 0.88rem;
+}
+
+.location-search__suggestion span {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.field-status--selected {
+  color: #2c6a59;
+  font-weight: 700;
+}
+
+.location-search__development-check {
+  color: #65736f;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono",
+    monospace;
+}
+
 .text-button {
   display: inline-flex;
   align-items: center;

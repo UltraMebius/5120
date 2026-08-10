@@ -28,6 +28,10 @@ interface JourneyContextValue extends JourneyState {
   continueCurrentRoute: () => void;
   resetJourney: () => void;
   selectRoute: (route: WalkingRoute) => void;
+  setDraftLocation: (
+    field: "destination" | "origin",
+    location: JourneyLocation | null,
+  ) => void;
   setSearchResults: (
     request: WalkingRouteSearchRequest,
     routes: WalkingRoute[],
@@ -71,6 +75,17 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
           alertVisible: false,
           selectedRoute: route,
           startedAt: new Date().toISOString(),
+          statusMessage: null,
+        }));
+      },
+      setDraftLocation: (field, location) => {
+        setState((current) => ({
+          ...current,
+          [field]: location,
+          alertVisible: false,
+          routes: [],
+          selectedRoute: null,
+          startedAt: null,
           statusMessage: null,
         }));
       },

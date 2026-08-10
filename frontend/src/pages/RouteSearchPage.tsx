@@ -43,7 +43,7 @@ function RouteSearchPage() {
             Compare walking routes by relative pedestrian activity and choose
             the crowd level that feels right for your journey.
           </p>
-          <span className="phase-pill">Epic 1 · Phase 1 preview</span>
+          <span className="phase-pill">Epic 1 · Phase 3A place search</span>
         </section>
 
         {error && (
@@ -59,6 +59,7 @@ function RouteSearchPage() {
           initialOrigin={journey.origin}
           initialPreference={journey.preference}
           isLoading={isLoading}
+          onDraftLocationChange={journey.setDraftLocation}
           onSearch={handleSearch}
         />
       </main>

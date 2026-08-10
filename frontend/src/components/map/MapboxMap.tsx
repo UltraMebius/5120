@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 
 import {
-  MAPBOX_PHASE_2_CONFIG,
+  MAPBOX_CONFIG,
   isMapboxConfigured,
 } from "../../services/mapbox";
 
@@ -32,7 +32,7 @@ function MapboxMap() {
     };
 
     try {
-      mapboxgl.accessToken = MAPBOX_PHASE_2_CONFIG.publicToken;
+      mapboxgl.accessToken = MAPBOX_CONFIG.publicToken;
       map = new mapboxgl.Map({
         center: MELBOURNE_CBD_CENTER,
         container,
@@ -84,7 +84,7 @@ function MapboxMap() {
         </div>
       )}
 
-      <span className="search-map__label">Mapbox GL JS smoke test</span>
+      <span className="search-map__label">Interactive Melbourne basemap</span>
     </section>
   );
 }

@@ -10,11 +10,26 @@ export interface Coordinate {
   longitude: number;
 }
 
-export interface JourneyLocation {
+export interface MapboxSelectedLocation {
+  fullAddress: string;
+  latitude: number;
+  longitude: number;
+  mapboxId: string;
+  name: string;
+}
+
+export interface MapboxJourneyLocation extends MapboxSelectedLocation {
+  label: string;
+  source: "MAPBOX";
+}
+
+export interface LegacyJourneyLocation {
   coordinates?: Coordinate;
   label: string;
   source: "CURRENT_LOCATION" | "MANUAL";
 }
+
+export type JourneyLocation = MapboxJourneyLocation | LegacyJourneyLocation;
 
 export type ManeuverDirection = "LEFT" | "RIGHT" | "STRAIGHT";
 

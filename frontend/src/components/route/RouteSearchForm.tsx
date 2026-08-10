@@ -4,15 +4,22 @@ import type { CrowdPreference } from "../../types/crowd";
 import type {
   Coordinate,
   JourneyLocation,
+  MapboxJourneyLocation,
+  MapboxSelectedLocation,
   WalkingRouteSearchRequest,
 } from "../../types/route";
 import CrowdPreferenceSelector from "../crowd/CrowdPreferenceSelector";
+import LocationSearchField from "./LocationSearchField";
 
 interface RouteSearchFormProps {
   initialDestination?: JourneyLocation | null;
   initialOrigin?: JourneyLocation | null;
   initialPreference: CrowdPreference;
   isLoading: boolean;
+  onDraftLocationChange: (
+    field: "destination" | "origin",
+    location: JourneyLocation | null,
+  ) => void;
   onSearch: (request: WalkingRouteSearchRequest) => Promise<void>;
 }
 
@@ -21,20 +28,60 @@ interface FormErrors {
   origin?: string;
 }
 
+interface LocationFieldState {
+  selectedLocation: MapboxSelectedLocation | null;
+  text: string;
+}
+
+function selectedLocationFromJourney(
+  location?: JourneyLocation | null,
+): MapboxSelectedLocation | null {
+  if (!location || location.source !== "MAPBOX") {
+    return null;
+  }
+
+  return {
+    fullAddress: location.fullAddress,
+    latitude: location.latitude,
+    longitude: location.longitude,
+    mapboxId: location.mapboxId,
+    name: location.name,
+  };
+}
+
+function journeyLocationFromSelection(
+  location: MapboxSelectedLocation,
+): MapboxJourneyLocation {
+  return {
+    ...location,
+    label: location.name,
+    source: "MAPBOX",
+  };
+}
+
 function RouteSearchForm({
   initialDestination,
   initialOrigin,
   initialPreference,
   isLoading,
+  onDraftLocationChange,
   onSearch,
 }: RouteSearchFormProps) {
-  const [origin, setOrigin] = useState(initialOrigin?.label ?? "");
-  const [destination, setDestination] = useState(
-    initialDestination?.label ?? "",
-  );
+  const [origin, setOrigin] = useState<LocationFieldState>({
+    selectedLocation: selectedLocationFromJourney(initialOrigin),
+    text: initialOrigin?.label ?? "",
+  });
+  const [destination, setDestination] = useState<LocationFieldState>({
+    selectedLocation: selectedLocationFromJourney(initialDestination),
+    text: initialDestination?.label ?? "",
+  });
   const [originCoordinates, setOriginCoordinates] = useState<
     Coordinate | undefined
-  >(initialOrigin?.coordinates);
+  >(
+    initialOrigin?.source === "CURRENT_LOCATION"
+      ? initialOrigin.coordinates
+      : undefined,
+  );
   const [preference, setPreference] =
     useState<CrowdPreference>(initialPreference);
   const [errors, setErrors] = useState<FormErrors>({});
@@ -48,16 +95,19 @@ function RouteSearchForm({
     }
 
     setIsLocating(true);
-    setLocationStatus("Requesting your current location…");
+    setLocationStatus("Requesting your current location...");
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setOrigin("Current location");
+        setOrigin({ selectedLocation: null, text: "Current location" });
         setOriginCoordinates({
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
         });
+        onDraftLocationChange("origin", null);
         setErrors((current) => ({ ...current, origin: undefined }));
-        setLocationStatus("Current location selected.");
+        setLocationStatus(
+          "Current location is available, but Phase 3A submission still requires a Mapbox place selection.",
+        );
         setIsLocating(false);
       },
       () => {
@@ -70,37 +120,82 @@ function RouteSearchForm({
     );
   }
 
+  function changeOriginText(text: string) {
+    if (origin.selectedLocation) {
+      onDraftLocationChange("origin", null);
+    }
+    setOrigin({ selectedLocation: null, text });
+    setOriginCoordinates(undefined);
+    setLocationStatus(null);
+    if (errors.origin) {
+      setErrors((current) => ({ ...current, origin: undefined }));
+    }
+  }
+
+  function changeDestinationText(text: string) {
+    if (destination.selectedLocation) {
+      onDraftLocationChange("destination", null);
+    }
+    setDestination({ selectedLocation: null, text });
+    if (errors.destination) {
+      setErrors((current) => ({ ...current, destination: undefined }));
+    }
+  }
+
+  function selectOrigin(location: MapboxSelectedLocation) {
+    setOrigin({ selectedLocation: location, text: location.name });
+    setOriginCoordinates(undefined);
+    setLocationStatus(null);
+    setErrors((current) => ({ ...current, origin: undefined }));
+    onDraftLocationChange("origin", journeyLocationFromSelection(location));
+  }
+
+  function selectDestination(location: MapboxSelectedLocation) {
+    setDestination({ selectedLocation: location, text: location.name });
+    setErrors((current) => ({ ...current, destination: undefined }));
+    onDraftLocationChange(
+      "destination",
+      journeyLocationFromSelection(location),
+    );
+  }
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const trimmedOrigin = origin.trim();
-    const trimmedDestination = destination.trim();
+    const trimmedOrigin = origin.text.trim();
+    const trimmedDestination = destination.text.trim();
     const nextErrors: FormErrors = {};
 
     if (!trimmedOrigin) {
       nextErrors.origin = "Origin is required.";
+    } else if (!origin.selectedLocation) {
+      nextErrors.origin =
+        "Select a starting point from the Mapbox suggestions.";
     }
 
     if (!trimmedDestination) {
       nextErrors.destination = "Destination is required.";
+    } else if (!destination.selectedLocation) {
+      nextErrors.destination =
+        "Select a destination from the Mapbox suggestions.";
     }
 
     setErrors(nextErrors);
 
-    if (nextErrors.origin || nextErrors.destination) {
+    if (
+      nextErrors.origin ||
+      nextErrors.destination ||
+      !origin.selectedLocation ||
+      !destination.selectedLocation
+    ) {
       return;
     }
 
     void onSearch({
-      destination: {
-        label: trimmedDestination,
-        source: "MANUAL",
-      },
-      origin: {
-        coordinates: originCoordinates,
-        label: trimmedOrigin,
-        source: originCoordinates ? "CURRENT_LOCATION" : "MANUAL",
-      },
+      destination: journeyLocationFromSelection(
+        destination.selectedLocation,
+      ),
+      origin: journeyLocationFromSelection(origin.selectedLocation),
       preference,
     });
   }
@@ -114,9 +209,11 @@ function RouteSearchForm({
           <span className="location-dot location-dot--destination" />
         </div>
 
-        <div className="field">
-          <div className="field-label-row">
-            <label htmlFor="origin">Starting point</label>
+        <LocationSearchField
+          error={errors.origin}
+          id="origin"
+          label="Starting point"
+          labelAction={
             <button
               className="text-button"
               disabled={isLocating}
@@ -124,70 +221,32 @@ function RouteSearchForm({
               type="button"
             >
               <span aria-hidden="true">◎</span>{" "}
-              {isLocating ? "Locating…" : "Use my location"}
+              {isLocating ? "Locating..." : "Use my location"}
             </button>
-          </div>
-          <input
-            aria-describedby={errors.origin ? "origin-error" : undefined}
-            aria-invalid={Boolean(errors.origin)}
-            id="origin"
-            name="origin"
-            onChange={(event) => {
-              setOrigin(event.target.value);
-              setOriginCoordinates(undefined);
-              if (errors.origin) {
-                setErrors((current) => ({ ...current, origin: undefined }));
-              }
-            }}
-            placeholder="Enter a Melbourne CBD address"
-            type="text"
-            value={origin}
-          />
-          {errors.origin && (
-            <p className="field-error" id="origin-error">
-              {errors.origin}
-            </p>
-          )}
-          {locationStatus && (
-            <p className="field-status" role="status">
-              {locationStatus}
-            </p>
-          )}
-        </div>
+          }
+          onSelect={selectOrigin}
+          onTextChange={changeOriginText}
+          placeholder="Search for a Melbourne place or address"
+          selectedLocation={origin.selectedLocation}
+          status={locationStatus}
+          value={origin.text}
+        />
 
-        <div className="field">
-          <label htmlFor="destination">Destination</label>
-          <input
-            aria-describedby={
-              errors.destination ? "destination-error" : undefined
-            }
-            aria-invalid={Boolean(errors.destination)}
-            id="destination"
-            name="destination"
-            onChange={(event) => {
-              setDestination(event.target.value);
-              if (errors.destination) {
-                setErrors((current) => ({
-                  ...current,
-                  destination: undefined,
-                }));
-              }
-            }}
-            placeholder="Where are you going?"
-            type="text"
-            value={destination}
-          />
-          {errors.destination && (
-            <p className="field-error" id="destination-error">
-              {errors.destination}
-            </p>
-          )}
-        </div>
+        <LocationSearchField
+          error={errors.destination}
+          id="destination"
+          label="Destination"
+          onSelect={selectDestination}
+          onTextChange={changeDestinationText}
+          placeholder="Search for a Melbourne place or address"
+          selectedLocation={destination.selectedLocation}
+          value={destination.text}
+        />
       </div>
 
       <p className="integration-note">
-        Address suggestions will connect to Mapbox Geocoding API v6 in a later
-        phase. Manual text currently loads preview routes.
+        Select both places from Mapbox suggestions. The next screen remains the
+        Phase 1 route preview; real walking directions are not requested yet.
       </p>
 
       <CrowdPreferenceSelector onChange={setPreference} value={preference} />
@@ -202,7 +261,7 @@ function RouteSearchForm({
         disabled={isLoading}
         type="submit"
       >
-        {isLoading ? "Finding preview routes…" : "Find sensory-friendly routes"}
+        {isLoading ? "Finding preview routes..." : "Find sensory-friendly routes"}
         <span aria-hidden="true">→</span>
       </button>
     </form>
