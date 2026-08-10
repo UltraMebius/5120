@@ -1,13 +1,13 @@
 # CalmWay
 
 CalmWay is a responsive walking-route web application for sensory-sensitive
-commuters in Melbourne CBD. The project has completed **Epic 1 Phase 2C**:
+commuters in Melbourne CBD. The project has completed **Epic 1 Phase 2D**:
 the Phase 1 page flow and contracts remain in place, and the FastAPI backend can
 verify PostgreSQL/PostGIS, import current sensor locations and the frozen hourly
 training window, transactionally build Local and Network historical baselines,
-ingest the bounded official minute feed, and materialise authoritative
-sensor-level current activity. Spatial and route-level crowd features remain
-placeholders.
+ingest the bounded official minute feed, materialise authoritative sensor-level
+current activity, and evaluate current crowd evidence at a geographic point
+with PostGIS. Route-level crowd features remain placeholders.
 
 ## Phase 1 flow
 
@@ -50,7 +50,6 @@ page is implemented here.
 
 The application still does **not** perform:
 
-- PostGIS spatial crowd interpolation or point activity scoring;
 - Mapbox geocoding, maps, or Directions requests;
 - real candidate-route evaluation and CalmWay ranking;
 - continuous GPS navigation, periodic crowd re-evaluation, or rerouting;
@@ -103,6 +102,9 @@ builder, and database verification.
 The [current activity guide](docs/current-activity-cn.md) documents the bounded
 minute source, missing/conflict semantics, exact windows, dual percentiles,
 manual refresh, and SQL verification.
+The [spatial point engine guide](docs/spatial-crowd-engine-cn.md) documents
+PostGIS neighbour discovery, the adopted 250/300 m support rule, normalised
+inverse-distance weighting, point uncertainty, and manual verification.
 
 Use Node.js 20 or newer for the frontend and Python 3.12 (or another compatible
 modern Python 3 release) for the backend.
@@ -149,10 +151,10 @@ From the repository root:
 .\.venv\Scripts\python.exe .\scripts\build_historical_baselines.py
 .\.venv\Scripts\python.exe .\scripts\refresh_current_activity.py --dry-run
 .\.venv\Scripts\python.exe .\scripts\refresh_current_activity.py
+.\.venv\Scripts\python.exe .\scripts\evaluate_crowd_point.py --longitude 144.96 --latitude -37.81
 cd frontend
 npm run build
 ```
 
-Later-phase tests for PostGIS spatial support, real route evaluation, GPS
-progress, and crowd-triggered rerouting are intentionally deferred until those
-features exist.
+Later-phase tests for real route evaluation, GPS progress, and crowd-triggered
+rerouting are intentionally deferred until those features exist.

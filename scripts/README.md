@@ -33,6 +33,13 @@ replaces only `current_sensor_activity`. Use `--dry-run` for a no-write preview
 and `--as-of` with an offset-aware ISO timestamp for repeatable window checks.
 No scheduler or raw retention deletion is introduced in Phase 2C.
 
+`evaluate_crowd_point.py` is the read-only Phase 2D point evaluator. It accepts
+WGS84 longitude/latitude, discovers current sensor support with PostGIS,
+applies the adopted 250/300 m coverage rule and normalised `1/d` weighting, and
+prints the current window and uncertainty explicitly. `--debug` adds only the
+contributing sensor IDs, metre distances, scores, and normalised weights. It
+does not call the City API, Mapbox, or write `spatial_activity_cache`.
+
 All ingestion and baseline jobs must follow the complete rules in
 `handoff/epic1_backend_handoff_v3/`, including exact-payload deduplication,
 conflict preservation, complete 15-minute windows, relocation restrictions,
