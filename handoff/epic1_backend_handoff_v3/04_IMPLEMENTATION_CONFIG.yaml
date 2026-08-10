@@ -1,0 +1,153 @@
+version: 3.0-final
+project:
+  name: Epic 1 Crowd-Aware Walking Route Planning
+  scope: walking_only
+  frontend: out_of_scope_for_this_handoff
+data:
+  local_historical_baseline_group:
+  - Location_ID
+  - HourDay
+  - Day_Type
+  network_historical_context_group:
+  - HourDay
+  - Day_Type
+  day_type_values:
+  - Weekday
+  - Weekend
+  outdoor_route_sensor_type: Outdoor
+  minute_ingestion_interval_minutes: 15
+crowd_scoring:
+  primary_live_crowd_exposure:
+    method: current_15m_network_percentile
+    status: confirmed
+  historical_network_context:
+    method: current_1h_network_historical_percentile
+    status: confirmed_by_V5B
+  local_condition:
+    method: current_1h_local_historical_percentile
+    status: confirmed_by_V5
+  rejected_combination:
+    method: max(local_historical_percentile, network_percentile)
+    status: rejected
+  bands:
+    very_low:
+    - 0
+    - 25
+    low:
+    - 25
+    - 50
+    moderate:
+    - 50
+    - 75
+    high:
+    - 75
+    - 90
+    very_high:
+    - 90
+    - 100
+    status: mvp_fixed_relative_activity_bands
+spatial:
+  max_support_radius_m:
+    value: 300
+    status: final_adopted
+  core_support_radius_m:
+    value: 250
+    status: final_adopted
+  coverage:
+    supported: nearest_valid_outdoor_sensor_distance_m <= 250
+    limited: 250 < nearest_valid_outdoor_sensor_distance_m <= 300
+    no_data: nearest_valid_outdoor_sensor_distance_m > 300 OR no valid score within
+      300m
+    status: final_adopted
+  weighting:
+    method: inverse_distance
+    power: 1
+    distance_floor_m: 1
+    normalise_weights: true
+    status: final_confirmed_by_V1B
+    V1B_300m:
+      coverage: 0.9298376514781176
+      MAE: 17.236376221447127
+      RMSE: 21.99557016022824
+      Median_AE: 14.119645831737774
+realtime:
+  current_window_minutes: 15
+  current_network_ranking_population: eligible outdoor sensors with >=1 valid unconflicted
+    row in the same complete 15m window
+  whole_window_no_rows:
+    state: AMBIGUOUS_NO_RECORD
+    use_as_zero: false
+    include_in_current_network_rank: false
+    status: final_confirmed_by_V3_V3B
+  sensor_specific_stale_threshold:
+    enabled: false
+    status: not_used_in_MVP
+  stale_semantics:
+    meaning: source_or_current_cache_freshness_failure_only
+    threshold: null
+    status: operational_monitoring_configuration_not_crowd_model
+  historical_comparison: previous_complete_clock_hour
+  direct_15m_vs_hourly_comparison: false
+  silent_hourly_fallback_for_missing_live_score: false
+relocation_local_baseline_rules:
+  '14':
+    action: allow_local_baseline_in_audited_window
+    reason: explicit relocation date 2019-10-02 predates 2024-08-08 audited hourly
+      start
+  '37':
+    action: local_baseline_from_date
+    from_date: '2024-08-12'
+    exclude_before_date_in_current_file: true
+  '47':
+    action: disable_local_condition_until_move_date_verified
+  '181':
+    action: disable_local_condition_until_move_date_verified
+  network_history:
+    action: retain_valid_count_observations_for_network_distribution
+preferences:
+  AVOID_BUSY:
+    max_preferred_network_score: 50
+    status: requires_user_validation
+  PREFER_QUIETER:
+    max_preferred_network_score: 75
+    status: requires_user_validation
+  FLEXIBLE:
+    max_preferred_network_score: 90
+    status: requires_user_validation
+route:
+  sample_interval_m:
+    value: 50
+    status: provisional_pending_real_route_V7
+  route_level_summary:
+    method: P75_crowd_exposure_score
+    status: mvp_recommended
+  ranking:
+    order:
+    - no_data_pct ASC
+    - pct_above_preference ASC
+    - p75_crowd_exposure_score ASC
+    - maximum_crowd_exposure_score ASC
+    - duration_seconds ASC
+    status: requires_user_validation
+validation:
+  completed:
+  - V1
+  - V1B
+  - V2
+  - V3
+  - V3B
+  - V4B
+  - V5
+  - V5B
+  - V6
+  remaining_code_validation:
+  - V7_route_sampling_when_real_routes_exist
+  remaining_non_code_validation:
+  - preference_mapping_user_validation
+  - route_ranking_tradeoff_user_validation
+  - sensor_47_move_date_manual_verification
+  - sensor_181_move_date_manual_verification
+database:
+  engine: PostgreSQL
+  postgis: true
+  schema_file_status: unchanged_from_V2

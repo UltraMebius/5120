@@ -1,16 +1,19 @@
 from fastapi import APIRouter
 
-from ..services.route_service import get_mock_routes
+from ..models.crowd import CrowdPreference
+from ..schemas.routes import RouteOption
+from ..services.routing import get_preview_routes
 
 router = APIRouter(tags=["routes"])
 
 
-@router.get("/routes")
+@router.get("/routes", response_model=list[RouteOption])
 def list_routes(
     origin: str | None = None,
     destination: str | None = None,
-) -> list[dict[str, object]]:
-    """Return temporary route options for the practice user interface."""
-    # The inputs reserve the future API shape. Mock routes do not use them yet.
+    preference: CrowdPreference = CrowdPreference.PREFER_QUIETER,
+) -> list[RouteOption]:
+    """Compatibility endpoint returning explicit Phase 1 preview routes."""
+    # Inputs reserve the UI flow. No Mapbox or crowd evaluation occurs in Phase 1.
     _ = (origin, destination)
-    return get_mock_routes()
+    return get_preview_routes(preference)

@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: epic1-postgis
+    environment:
+      POSTGRES_DB: epic1
+      POSTGRES_USER: epic1
+      POSTGRES_PASSWORD: epic1
+    ports:
+      - "5432:5432"
+    volumes:
+      - epic1_pgdata:/var/lib/postgresql/data
+      - ./05_DATABASE_SCHEMA.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+
+volumes:
+  epic1_pgdata:

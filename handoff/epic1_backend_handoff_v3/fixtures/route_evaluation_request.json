@@ -1,0 +1,27 @@
+{
+  "preference": "PREFER_QUIETER",
+  "routes": [
+    {
+      "routeId": "route-a",
+      "distanceM": 1250,
+      "durationSeconds": 930,
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            144.9631,
+            -37.8136
+          ],
+          [
+            144.965,
+            -37.812
+          ],
+          [
+            144.968,
+            -37.8105
+          ]
+        ]
+      }
+    }
+  ]
+}

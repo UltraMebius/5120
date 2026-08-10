@@ -1,0 +1,8 @@
+candidate_stale_minutes,sensors_with_max_gap_at_least_threshold,sensor_pct
+30,50,50.0
+60,32,32.0
+90,23,23.0
+120,14,14.000000000000002
+180,11,11.0
+240,9,9.0
+360,6,6.0

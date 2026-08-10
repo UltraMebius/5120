@@ -1,17 +1,24 @@
-import type { Route } from "../types/route";
+import { APP_CONFIG } from "../config";
+import type {
+  WalkingRoute,
+  WalkingRouteSearchRequest,
+} from "../types/route";
 
-const API_BASE_URL = "http://localhost:8000";
-
-export async function fetchRoutes(
-  origin: string,
-  destination: string,
-): Promise<Route[]> {
-  const query = new URLSearchParams({ origin, destination });
-  const response = await fetch(`${API_BASE_URL}/api/routes?${query.toString()}`);
+export async function findWalkingRoutes(
+  request: WalkingRouteSearchRequest,
+): Promise<WalkingRoute[]> {
+  const query = new URLSearchParams({
+    origin: request.origin.label,
+    destination: request.destination.label,
+    preference: request.preference,
+  });
+  const response = await fetch(
+    `${APP_CONFIG.apiBaseUrl}/api/routes?${query.toString()}`,
+  );
 
   if (!response.ok) {
     throw new Error("Could not load routes. Check that the backend is running.");
   }
 
-  return (await response.json()) as Route[];
+  return (await response.json()) as WalkingRoute[];
 }

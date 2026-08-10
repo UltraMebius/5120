@@ -1,19 +1,18 @@
 # Data folders
 
-No real dataset is included in the current practice scaffold.
+No City of Melbourne dataset is ingested or bundled in Phase 1.
+
+The confirmed dataset IDs, data states, natural keys, historical contexts, and
+processing rules are documented in `handoff/epic1_backend_handoff_v3/`. The
+final application stores source and derived data in PostgreSQL/PostGIS rather
+than treating `data/processed/` files as the production database.
 
 ## `data/raw/`
 
-Purpose: store original datasets received or downloaded by the Data Science team.
-
-Rules:
-
-- Raw files should remain unchanged where possible.
-- Raw data should not be manually edited.
-- Dataset source information should be documented.
+Reserved only for controlled local Data Science exploration. Preserve original
+source files and document provenance; do not commit secrets or large downloads.
 
 ## `data/processed/`
 
-Purpose: store cleaned and transformed datasets produced by the Data Science team and ready for backend use.
-
-The final pedestrian dataset and its schema have not yet been confirmed. The current data-related files are placeholders for team collaboration and will be updated after the Data Science team provides the processed dataset.
+Reserved for reproducible validation outputs or exchange artifacts. Backend
+request-time services must ultimately use the authoritative PostGIS schema.

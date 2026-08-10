@@ -1,0 +1,26 @@
+{
+  "records": [
+    {
+      "Location_ID": 11,
+      "Sensing_DateTime": "2026-08-10T00:15:00Z",
+      "Sensing_Date": "2026-08-10",
+      "Sensing_Time": "10:15:00",
+      "Direction_1": 10,
+      "Direction_2": 8,
+      "Total_of_Directions": 18
+    },
+    {
+      "Location_ID": 11,
+      "Sensing_DateTime": "2026-08-10T00:15:00Z",
+      "Sensing_Date": "2026-08-10",
+      "Sensing_Time": "10:15:00",
+      "Direction_1": 13,
+      "Direction_2": 9,
+      "Total_of_Directions": 22
+    }
+  ],
+  "expected": {
+    "logical_key_conflict": true,
+    "processed_current_score_use": false
+  }
+}

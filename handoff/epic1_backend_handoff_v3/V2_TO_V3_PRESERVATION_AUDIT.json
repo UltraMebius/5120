@@ -1,0 +1,50 @@
+[
+  {
+    "file": "05_DATABASE_SCHEMA.sql",
+    "v2_sha256": "179bb3e94648796011d4f9302b82b6e718fe62b5e4cee8b1b6d4984232450efd",
+    "v3_sha256": "179bb3e94648796011d4f9302b82b6e718fe62b5e4cee8b1b6d4984232450efd",
+    "identical": true
+  },
+  {
+    "file": "06_ERD_LATEST.md",
+    "v2_sha256": "87d55b9f9bd251ffce448b039bc9690d9688a7cdb0bb993e7883e4effd8e5a39",
+    "v3_sha256": "87d55b9f9bd251ffce448b039bc9690d9688a7cdb0bb993e7883e4effd8e5a39",
+    "identical": true
+  },
+  {
+    "file": "07_ERD_LATEST.dbml",
+    "v2_sha256": "8f928a67b02fd7865fccd8609bc4c231d53bb1866d3a97e17a17439ad885fe53",
+    "v3_sha256": "8f928a67b02fd7865fccd8609bc4c231d53bb1866d3a97e17a17439ad885fe53",
+    "identical": true
+  },
+  {
+    "file": "10_EXTERNAL_APIS.md",
+    "v2_sha256": "0a2b58526ecb46391843071fafad9632bcf0898b15ae1824fa9f41d34a5d758e",
+    "v3_sha256": "0a2b58526ecb46391843071fafad9632bcf0898b15ae1824fa9f41d34a5d758e",
+    "identical": true
+  },
+  {
+    "file": "14_ARCHITECTURE.md",
+    "v2_sha256": "506958e52ed2f813732f90b0ca426aa601df5f0c8b4a639f25ac7ffbc83120db",
+    "v3_sha256": "506958e52ed2f813732f90b0ca426aa601df5f0c8b4a639f25ac7ffbc83120db",
+    "identical": true
+  },
+  {
+    "file": "17_docker-compose.yml",
+    "v2_sha256": "a9e91a99e01b5ea1f177aa06bd61f139954c2caee427cc6206f8e1157742411e",
+    "v3_sha256": "a9e91a99e01b5ea1f177aa06bd61f139954c2caee427cc6206f8e1157742411e",
+    "identical": true
+  },
+  {
+    "file": "fixtures/minute_conflict_example.json",
+    "v2_sha256": "1e3230cb1aa71c3866938c218a9410d2992ecb35520c687549e5953ed56cd818",
+    "v3_sha256": "1e3230cb1aa71c3866938c218a9410d2992ecb35520c687549e5953ed56cd818",
+    "identical": true
+  },
+  {
+    "file": "fixtures/route_evaluation_request.json",
+    "v2_sha256": "6dde7548b3bf81b588ff755ac240bd358159d61d8b47b31330683291ad3a23ae",
+    "v3_sha256": "6dde7548b3bf81b588ff755ac240bd358159d61d8b47b31330683291ad3a23ae",
+    "identical": true
+  }
+]

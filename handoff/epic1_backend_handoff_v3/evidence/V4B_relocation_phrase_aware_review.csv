@@ -1,0 +1,5 @@
+Location_ID,Sensor_Name,Note,Candidate_Move_Date,Date_Association,Manual_Review_Required,historical_first_date,historical_last_date,pre_90d_rows,post_90d_rows,pre_90d_median,post_90d_median
+14,SanBri_T,Sensor relocated to sensor ID 25 on 2/10/2019,2019-10-02,EXPLICIT_MOVE_DATE_AFTER_ON,False,2024-08-08,2026-08-07,0.0,0.0,,
+47,Eli250_T,"Pushbox Upgrade, 25/07/2023. Move to 250 Elizabeth Street from adjacent St. Francis Church at 266 Elizabeth.",2023-07-25,DATE_BEFORE_MOVE_PHRASE_REVIEW,True,2024-08-08,2026-08-07,,,,
+181,Eli368_T,Moved from 380 Elizabeth Street,,MOVE_WITHOUT_ASSOCIATED_DATE,True,2025-03-26,2026-08-07,,,,
+37,Lyg260_T,"Pushbox Upgrade, 30/06/2023. Move from 174 to 260 Lygon Street (12/08/2024)",2024-08-12,DATE_AFTER_MOVE_PHRASE,False,2024-08-08,2026-08-07,74.0,1769.0,75.0,86.0

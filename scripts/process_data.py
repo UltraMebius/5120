@@ -1,14 +1,13 @@
-"""Placeholder entry point for future CalmWay data preparation.
+"""Phase 1 placeholder for future CalmWay ingestion/baseline tooling.
 
-No dataset is read, downloaded, cleaned, or transformed by this module yet.
+No dataset is read, downloaded, cleaned, transformed, or scored here.
 """
 
 
 def main() -> None:
     """Explain the current no-op behaviour when run directly."""
-    # TODO: Add documented cleaning, transformation, and validation steps after
-    # the Data Science team confirms the source dataset and processed schema.
-    print("No data processing is configured yet; see scripts/README.md.")
+    # Follow handoff/epic1_backend_handoff_v3 when Phase 2 begins.
+    print("No Phase 1 data processing is configured; see scripts/README.md.")
 
 
 if __name__ == "__main__":

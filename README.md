@@ -1,127 +1,103 @@
 # CalmWay
 
-## Project Overview
+CalmWay is a responsive walking-route web application for sensory-sensitive
+commuters in Melbourne CBD. This repository is currently at **Epic 1 Phase 1**:
+the final page flow, typed contracts, configuration, and backend module
+boundaries are in place, while routing and crowd-data features remain explicit
+preview placeholders.
 
-CalmWay is a Monash University FIT5120 practice project for a sensory-friendly navigation web application. It is intended to help sensory-sensitive commuters compare walking route options through Melbourne CBD using simple sensory indicators.
-
-This repository is a small practice scaffold, not a complete navigation product.
-
-## Current Practice Iteration Scope
-
-This iteration only establishes the foundation for:
-
-- entering an origin;
-- entering a destination;
-- displaying route options; and
-- displaying a sensory indicator for each route.
-
-Route results are temporary mock data. There is no real routing, pedestrian-data integration, or sensory calculation yet.
-
-## Current User Story
-
-**User Story 1.1**
-
-As a sensory-sensitive commuter, I want to see a sensory indicator for different routes, so that I can choose a less overwhelming route.
-
-## Acceptance Criteria
-
-1. The user can enter an origin and destination.
-2. The system can display at least two route options.
-3. Each route can display a LOW, MEDIUM, or HIGH sensory indicator.
-4. A lower-sensory route can be marked as recommended.
-
-## Technology Stack
-
-- Frontend: React, Vite, and TypeScript
-- Backend: Python and FastAPI
-- Testing: pytest and FastAPI TestClient
-
-## Repository Structure
+## Phase 1 flow
 
 ```text
-.
-|-- frontend/
-|   |-- src/
-|   |   |-- components/
-|   |   |   |-- RouteCard.tsx
-|   |   |   |-- RouteSearchForm.tsx
-|   |   |   `-- SensoryBadge.tsx
-|   |   |-- services/api.ts
-|   |   |-- types/route.ts
-|   |   |-- App.tsx
-|   |   |-- main.tsx
-|   |   `-- styles.css
-|   |-- index.html
-|   |-- package.json
-|   |-- package-lock.json
-|   |-- tsconfig.json
-|   `-- vite.config.ts
-|-- backend/
-|   |-- app/
-|   |   |-- api/routes.py
-|   |   |-- services/
-|   |   |   |-- pedestrian_service.py
-|   |   |   |-- route_service.py
-|   |   |   `-- sensory_service.py
-|   |   |-- config.py
-|   |   `-- main.py
-|   `-- requirements.txt
-|-- data/
-|   |-- raw/.gitkeep
-|   |-- processed/.gitkeep
-|   `-- README.md
-|-- scripts/
-|   |-- process_data.py
-|   `-- README.md
-|-- tests/
-|   |-- test_api.py
-|   `-- test_sensory.py
-|-- docs/
-|   |-- acceptance-criteria.md
-|   |-- architecture.md
-|   `-- team-guide.md
-|-- .env.example
-|-- .gitignore
-`-- README.md
+Future Home
+  -> Route Search
+  -> Route Options
+  -> Active Navigation
+  -> optional Crowd Alert state
+  -> Arrival
+  -> configurable Home route
 ```
 
-## Folder Responsibilities
+Frontend routes:
 
-- `frontend/`: React user interface, form, route cards, sensory badges, and API calls.
-- `backend/`: FastAPI endpoints and service-layer responsibilities.
-- `data/`: placeholders for raw and processed data managed by the Data Science team.
-- `scripts/`: future data cleaning, transformation, and validation tools.
-- `tests/`: small backend API and placeholder sensory-service tests.
-- `docs/`: acceptance criteria, architecture, and team guidance.
+- `/routes/search`
+- `/routes/options`
+- `/navigation`
+- `/arrival`
 
-## Current Architecture
+The root route temporarily redirects to Route Search. The Home page belongs to
+another team member; `VITE_HOME_ROUTE` is the integration boundary and no Home
+page is implemented here.
 
-The intended flow is `React frontend -> FastAPI backend -> services -> processed data`. Only the frontend, API, and mock service response are active in this iteration. The processed-data integration and real sensory calculation are placeholders.
+## Implemented in Phase 1
 
-See [docs/architecture.md](docs/architecture.md) for more detail.
+- React Router page structure and a small Journey Context;
+- responsive desktop/mobile UI for the complete Epic 1 flow;
+- manual origin/destination fields and one-time browser current-location input;
+- single-select LOW/MEDIUM/HIGH crowd preference UI;
+- route options supporting any returned candidate count;
+- active-navigation, alert, alternative, and arrival preview states;
+- FastAPI domain enums, response schemas, service boundaries, and environment
+  configuration;
+- presentation-only mapping from five backend crowd levels to three UI levels;
+- two clearly labelled mock routes through the legacy `GET /api/routes`
+  compatibility endpoint.
 
-## Environment Requirements
+## Not implemented yet
 
-- Node.js with npm
-- Python 3.12, or another compatible modern Python 3 version
+Phase 1 does **not** perform:
 
-React and Vite are installed as project dependencies; no global installation is required.
+- City of Melbourne data ingestion or baseline calculation;
+- current 15-minute Network Crowd Exposure scoring;
+- PostgreSQL/PostGIS access or spatial scoring;
+- Mapbox geocoding, maps, or Directions requests;
+- real candidate-route evaluation and CalmWay ranking;
+- continuous GPS navigation, periodic crowd re-evaluation, or rerouting;
+- deployment.
 
-## Frontend Setup
+The UI preview does not claim live data. Mapbox packages are deferred until
+their first real use; only configuration and service boundaries exist now.
 
-From the repository root in Windows PowerShell:
+## Crowd algorithm source of truth
 
-```powershell
-cd frontend
-npm install
-npm run dev
-```
+The authoritative backend/data package is
+`handoff/epic1_backend_handoff_v3/`. Phase 1 does not reimplement or simplify
+its algorithm. The frozen contract includes:
 
-The development site is normally available at `http://localhost:5173`. Start the backend separately so the form can load its mock routes.
+- primary Crowd Exposure: current complete 15-minute **Network percentile**;
+- Local Historical Percentile as a separate Local Condition (never `MAX`);
+- backend bands at 25/50/75/90 across five internal levels;
+- `SUPPORTED <=250 m`, `LIMITED >250–300 m`, otherwise `NO_DATA`;
+- normalised inverse-distance weighting `1 / max(distance, 1 m)`;
+- 50 m configurable route sampling and P75 route summary;
+- route ranking by No Data %, preference exceedance %, P75 exposure, maximum
+  exposure, then duration.
 
-## Backend Setup
+`NO_DATA` and `AMBIGUOUS_NO_RECORD` must never be converted to LOW or zero.
+These are relative pedestrian-activity estimates, not persons/m², medical, or
+safety thresholds.
 
-From the repository root in Windows PowerShell:
+See [the Simplified Chinese implementation plan](docs/final-epic1-implementation-plan-cn.md)
+for the complete phase plan and scope decisions.
+
+## Technology
+
+- Frontend: React 18, React Router, Vite, TypeScript
+- Backend: Python 3.12, FastAPI, Pydantic
+- Final data architecture: PostgreSQL + PostGIS
+- Final map/search/routing provider: Mapbox GL JS, Geocoding API v6, Directions
+  API with `mapbox/walking`
+- Tests: pytest and FastAPI TestClient
+
+Use Node.js 20 or newer for the frontend and Python 3.12 (or another compatible
+modern Python 3 release) for the backend.
+
+## Local setup
+
+Create local environment files from `.env.example` as needed. Keep all actual
+`.env` files untracked and never place a server token in a `VITE_` variable.
+
+Backend:
 
 ```powershell
 cd backend
@@ -131,93 +107,31 @@ python -m pip install -r requirements.txt
 python -m uvicorn app.main:app --reload
 ```
 
-The API is normally available at `http://localhost:8000`.
-
-## Backend Health Check
-
-With the backend running, request:
-
-```text
-GET http://localhost:8000/health
-```
-
-Expected response:
-
-```json
-{"status": "ok"}
-```
-
-## Running Tests
-
-Install the backend requirements, then run this command from the repository root:
+Frontend, in another terminal:
 
 ```powershell
-python -m pytest
+cd frontend
+npm install
+npm run dev
 ```
 
-To verify the frontend separately:
+Local URLs:
+
+- frontend: `http://localhost:5173`
+- backend: `http://localhost:8000`
+- health check: `GET http://localhost:8000/health`
+- Swagger: `http://localhost:8000/docs`
+
+## Verification
+
+From the repository root:
 
 ```powershell
+.\backend\.venv\Scripts\python.exe -m pytest
 cd frontend
 npm run build
 ```
 
-## Data Science Workflow
-
-The planned handoff is:
-
-```text
-Raw dataset -> data/raw/ -> processing scripts -> data/processed/ -> pedestrian_service.py
-```
-
-No dataset or schema is assumed in the current scaffold.
-
-## Data Team Handover
-
-Before real data integration begins, the Data Science team should provide:
-
-- the final selected dataset;
-- the processed data file;
-- the processed data format;
-- field definitions;
-- the data source;
-- update frequency, if known;
-- an explanation of missing values; and
-- recommendations for crowd or sensory thresholds, if applicable.
-
-These details must be documented from the real handover rather than invented in advance.
-
-## Development Status
-
-Implemented now:
-
-- repository scaffold;
-- basic React user interface;
-- basic FastAPI API and health check;
-- mock route display; and
-- project and team documentation.
-
-Not implemented yet:
-
-- real pedestrian data;
-- real route generation;
-- real sensory scoring;
-- maps or geolocation;
-- real-time crowd information;
-- public transport integration;
-- database or authentication;
-- deployment infrastructure; or
-- machine learning or generative AI.
-
-## Git Collaboration Workflow
-
-1. Work on a personal or feature branch.
-2. Pull the latest `main` before major work.
-3. Commit small, meaningful changes.
-4. Push the personal branch.
-5. Create a pull request.
-6. Ask for peer review before merging into `main`.
-
-## Limitations
-
-CalmWay is currently a university practice prototype. Its mock sensory information is for demonstrating decision support only and does not provide medical, accessibility, or safety guarantees.
+Later-phase tests for ingestion, percentiles, PostGIS boundaries, real route
+evaluation, GPS progress, and crowd-triggered rerouting are intentionally
+deferred until those features exist.

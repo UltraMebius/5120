@@ -1,0 +1,337 @@
+openapi: 3.0.3
+info:
+  title: Epic 1 Crowd-Aware Walking API
+  version: 3.0.0
+  description: >
+    Final walking-only backend contract. Network percentile is the primary
+    Crowd Exposure metric. Local Historical Percentile is a separate Local
+    Condition metric. Point estimates use inverse-distance weighting inside
+    a maximum 300 m support radius.
+
+servers:
+  - url: /api/v1
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Healthy
+
+  /crowd/sensors/current:
+    get:
+      summary: Current derived sensor crowd states
+      responses:
+        '200':
+          description: Current sensor states
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  updatedAt:
+                    type: string
+                    format: date-time
+                  sensors:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SensorCurrentState'
+
+  /crowd/point:
+    get:
+      summary: Estimate current Crowd Exposure at one geographic point
+      parameters:
+        - in: query
+          name: lat
+          required: true
+          schema:
+            type: number
+        - in: query
+          name: lon
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          description: Point estimate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PointCrowdEstimate'
+
+  /routes/walking:
+    post:
+      summary: Get walking candidate routes and crowd evaluation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WalkingRouteRequest'
+      responses:
+        '200':
+          description: Evaluated candidate routes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  preference:
+                    $ref: '#/components/schemas/CrowdPreference'
+                  routes:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RouteEvaluation'
+                  recommendedRouteId:
+                    type: string
+                    nullable: true
+                  rankingStatus:
+                    type: string
+                    enum: [PROVISIONAL, VALIDATED]
+        '502':
+          description: Routing service error
+
+  /routes/evaluate:
+    post:
+      summary: Evaluate supplied walking route geometries
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [routes, preference]
+              properties:
+                preference:
+                  $ref: '#/components/schemas/CrowdPreference'
+                routes:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/RouteGeometryInput'
+      responses:
+        '200':
+          description: Evaluated routes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  routes:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RouteEvaluation'
+
+components:
+  schemas:
+    CrowdPreference:
+      type: string
+      enum: [AVOID_BUSY, PREFER_QUIETER, FLEXIBLE]
+
+    CrowdLevel:
+      type: string
+      enum: [VERY_LOW, LOW, MODERATE, HIGH, VERY_HIGH]
+
+    LocalCondition:
+      type: string
+      enum:
+        - MUCH_QUIETER_THAN_USUAL
+        - QUIETER_THAN_USUAL
+        - TYPICAL
+        - BUSIER_THAN_USUAL
+        - MUCH_BUSIER_THAN_USUAL
+
+    CoverageStatus:
+      type: string
+      enum: [SUPPORTED, LIMITED, NO_DATA]
+
+    DataState:
+      type: string
+      description: >
+        STALE is reserved for source/cache freshness failure. A sensor with
+        no rows in one complete 15-minute window is AMBIGUOUS_NO_RECORD.
+      enum: [OK, AMBIGUOUS_NO_RECORD, STALE, CONFLICTED, NO_DATA]
+
+    SensorCurrentState:
+      type: object
+      required: [locationId, latitude, longitude, dataState]
+      properties:
+        locationId:
+          type: integer
+          format: int64
+        sensorName:
+          type: string
+          nullable: true
+        latitude:
+          type: number
+        longitude:
+          type: number
+        current15mObservedRows:
+          type: integer
+          nullable: true
+        current15mCount:
+          type: integer
+          nullable: true
+        current15mNetworkPercentile:
+          type: number
+          nullable: true
+        crowdExposureScore:
+          type: number
+          nullable: true
+          description: Equals current15mNetworkPercentile when current data are valid.
+        crowdLevel:
+          allOf:
+            - $ref: '#/components/schemas/CrowdLevel'
+          nullable: true
+        comparisonHourStart:
+          type: string
+          format: date-time
+          nullable: true
+        current1hCount:
+          type: integer
+          nullable: true
+        networkHistoricalPercentile:
+          type: number
+          nullable: true
+        localHistoricalPercentile:
+          type: number
+          nullable: true
+        localCondition:
+          allOf:
+            - $ref: '#/components/schemas/LocalCondition'
+          nullable: true
+        dataState:
+          $ref: '#/components/schemas/DataState'
+        updatedAt:
+          type: string
+          format: date-time
+
+    PointCrowdEstimate:
+      type: object
+      required: [latitude, longitude, coverageStatus]
+      properties:
+        latitude:
+          type: number
+        longitude:
+          type: number
+        crowdExposureScore:
+          type: number
+          nullable: true
+          description: Inverse-distance-weighted Network Crowd Exposure score.
+        crowdLevel:
+          allOf:
+            - $ref: '#/components/schemas/CrowdLevel'
+          nullable: true
+        localConditionScore:
+          type: number
+          nullable: true
+        localCondition:
+          allOf:
+            - $ref: '#/components/schemas/LocalCondition'
+          nullable: true
+        coverageStatus:
+          $ref: '#/components/schemas/CoverageStatus'
+        supportingSensors:
+          type: integer
+        nearestSensorDistanceM:
+          type: number
+          nullable: true
+        supportingScoreStddev:
+          type: number
+          nullable: true
+        weightingMethod:
+          type: string
+          example: inverse_distance_1_over_d
+        updatedAt:
+          type: string
+          format: date-time
+
+    Coordinate:
+      type: object
+      required: [lat, lon]
+      properties:
+        lat:
+          type: number
+        lon:
+          type: number
+
+    WalkingRouteRequest:
+      type: object
+      required: [origin, destination, preference]
+      properties:
+        origin:
+          $ref: '#/components/schemas/Coordinate'
+        destination:
+          $ref: '#/components/schemas/Coordinate'
+        preference:
+          $ref: '#/components/schemas/CrowdPreference'
+        candidateCount:
+          type: integer
+          minimum: 1
+          maximum: 3
+          default: 3
+
+    RouteGeometryInput:
+      type: object
+      required: [routeId, geometry]
+      properties:
+        routeId:
+          type: string
+        durationSeconds:
+          type: number
+          nullable: true
+        distanceM:
+          type: number
+          nullable: true
+        geometry:
+          type: object
+          description: GeoJSON LineString
+
+    RouteEvaluation:
+      type: object
+      required: [routeId, geometry, dataCoveragePct, noDataPct]
+      properties:
+        routeId:
+          type: string
+        geometry:
+          type: object
+          description: GeoJSON LineString
+        distanceM:
+          type: number
+        durationSeconds:
+          type: number
+        routeCrowdLevel:
+          allOf:
+            - $ref: '#/components/schemas/CrowdLevel'
+          nullable: true
+        medianCrowdExposureScore:
+          type: number
+          nullable: true
+        p75CrowdExposureScore:
+          type: number
+          nullable: true
+        maximumCrowdExposureScore:
+          type: number
+          nullable: true
+        pctAbovePreference:
+          type: number
+          nullable: true
+        pctVeryHigh:
+          type: number
+          nullable: true
+        medianLocalConditionScore:
+          type: number
+          nullable: true
+        pctBusierThanUsual:
+          type: number
+          nullable: true
+        dataCoveragePct:
+          type: number
+        limitedCoveragePct:
+          type: number
+        noDataPct:
+          type: number
+        sampleIntervalM:
+          type: number
+        sampleCount:
+          type: integer

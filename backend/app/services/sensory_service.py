@@ -1,16 +1,20 @@
-"""Temporary sensory-level behaviour for the mock route flow."""
+"""Deprecated compatibility shim for the original mock sensory service."""
 
 from typing import Literal
+
+from ..models.crowd import CrowdLevel
+from .crowd.presentation import to_frontend_crowd_level
 
 SensoryLevel = Literal["LOW", "MEDIUM", "HIGH", "UNKNOWN"]
 
 
 def get_mock_sensory_level(route_id: str) -> SensoryLevel:
-    """Return a fixed mock label for the two temporary route examples."""
-    # TODO: Define real calculations and thresholds only after the processed
-    # pedestrian data has been analysed and documented by the team.
-    mock_levels: dict[str, SensoryLevel] = {
-        "route-a": "LOW",
-        "route-b": "HIGH",
+    """Preserve existing tests while presenting only the three UI levels."""
+    mock_internal_levels = {
+        "route-a": CrowdLevel.LOW,
+        "route-b": CrowdLevel.HIGH,
     }
-    return mock_levels.get(route_id, "UNKNOWN")
+    internal_level = mock_internal_levels.get(route_id)
+    if internal_level is None:
+        return "UNKNOWN"
+    return to_frontend_crowd_level(internal_level).value

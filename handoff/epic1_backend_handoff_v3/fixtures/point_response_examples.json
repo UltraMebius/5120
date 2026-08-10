@@ -1,0 +1,32 @@
+{
+  "supported": {
+    "crowdExposureScore": 82.5,
+    "crowdLevel": "HIGH",
+    "localConditionScore": 43.0,
+    "localCondition": "QUIETER_THAN_USUAL",
+    "coverageStatus": "SUPPORTED",
+    "supportingSensors": 4,
+    "nearestSensorDistanceM": 72.0,
+    "weightingMethod": "inverse_distance_1_over_d"
+  },
+  "limited": {
+    "crowdExposureScore": 61.2,
+    "crowdLevel": "MODERATE",
+    "localConditionScore": null,
+    "localCondition": null,
+    "coverageStatus": "LIMITED",
+    "supportingSensors": 1,
+    "nearestSensorDistanceM": 274.0,
+    "weightingMethod": "inverse_distance_1_over_d"
+  },
+  "no_data": {
+    "crowdExposureScore": null,
+    "crowdLevel": null,
+    "localConditionScore": null,
+    "localCondition": null,
+    "coverageStatus": "NO_DATA",
+    "supportingSensors": 0,
+    "nearestSensorDistanceM": 342.0,
+    "weightingMethod": "inverse_distance_1_over_d"
+  }
+}

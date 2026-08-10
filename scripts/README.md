@@ -1,10 +1,10 @@
 # Data processing scripts
 
-This folder is reserved for future:
+`process_data.py` remains a Phase 1 no-op. It does not download, transform, or
+score City of Melbourne data.
 
-- data cleaning;
-- data transformation;
-- data validation; and
-- preparation of processed files for backend use.
-
-`process_data.py` is currently a safe no-op placeholder. It does not assume a dataset schema, download data, or perform cleaning. The implementation should be updated only after the Data Science team confirms and documents the selected dataset and output format.
+Later ingestion and baseline jobs must follow the complete rules in
+`handoff/epic1_backend_handoff_v3/`, including exact-payload deduplication,
+conflict preservation, complete 15-minute windows, relocation restrictions,
+and separate Network and Local percentiles. One-off file processing must not
+replace the final PostgreSQL/PostGIS architecture.

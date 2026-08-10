@@ -1,0 +1,222 @@
+[
+  {
+    "path": "00_README.md",
+    "bytes": 4647,
+    "sha256": "7c25a6371f99308f109509b23df12834b244a7566f9bead750755079bc44e2c9"
+  },
+  {
+    "path": "00_V3_CHANGELOG_AND_IMPACT.md",
+    "bytes": 6102,
+    "sha256": "9a6c5d221bed06a574c40986cb35d6e7eb292543367d740585418f66f1ddc5ea"
+  },
+  {
+    "path": "01_SCOPE_AND_DECISIONS.md",
+    "bytes": 6232,
+    "sha256": "e153a1a03aa2ca79c9b5b249356047bba9c6e962546189d963b2a2b2c880abf3"
+  },
+  {
+    "path": "02_CROWD_ALGORITHM_SPEC.md",
+    "bytes": 5944,
+    "sha256": "74605c8c8f03301fb5a771836b401275555621ee4ad079dc8758bad1af8227a2"
+  },
+  {
+    "path": "03_SPATIAL_SUPPORT_300M.md",
+    "bytes": 5322,
+    "sha256": "6a04a94b581c44b013c1eab3f110f872fe6d59af5820b49d0517b56e4ffef170"
+  },
+  {
+    "path": "04_IMPLEMENTATION_CONFIG.yaml",
+    "bytes": 4111,
+    "sha256": "1f0b8b034535aa093d99ff6eb25fc4e44aa80a5f53b3c3ec907eec2bba83333d"
+  },
+  {
+    "path": "05_DATABASE_SCHEMA.sql",
+    "bytes": 10560,
+    "sha256": "179bb3e94648796011d4f9302b82b6e718fe62b5e4cee8b1b6d4984232450efd"
+  },
+  {
+    "path": "06_ERD_LATEST.md",
+    "bytes": 4769,
+    "sha256": "87d55b9f9bd251ffce448b039bc9690d9688a7cdb0bb993e7883e4effd8e5a39"
+  },
+  {
+    "path": "07_ERD_LATEST.dbml",
+    "bytes": 3733,
+    "sha256": "8f928a67b02fd7865fccd8609bc4c231d53bb1866d3a97e17a17439ad885fe53"
+  },
+  {
+    "path": "08_REALTIME_INGESTION_SPEC.md",
+    "bytes": 5411,
+    "sha256": "b62c2be0090fa91e54e26a2156aa6c50d9a5580521184166211e9077ed6f17a9"
+  },
+  {
+    "path": "09_INTERNAL_API_OPENAPI.yaml",
+    "bytes": 9009,
+    "sha256": "13056f6cefd78faadacadd27615a71c8122157af5e54efb0fb6d18f07307e321"
+  },
+  {
+    "path": "10_EXTERNAL_APIS.md",
+    "bytes": 4058,
+    "sha256": "0a2b58526ecb46391843071fafad9632bcf0898b15ae1824fa9f41d34a5d758e"
+  },
+  {
+    "path": "11_BACKEND_ACCEPTANCE_CRITERIA.md",
+    "bytes": 5488,
+    "sha256": "226527e0c9fe0d429691a780203d4b778cfe35ccd196117d7fc867be979558ac"
+  },
+  {
+    "path": "12_BACKEND_TEST_PLAN.md",
+    "bytes": 3158,
+    "sha256": "84d94ac6c1b28801e3aa35e3fa17633b5b41c6733e0ba61258182f43174e2748"
+  },
+  {
+    "path": "13_UNCERTAINTIES_AND_VALIDATION.md",
+    "bytes": 2416,
+    "sha256": "4694b8acd4f3f84b13376b369d0424db5914dcc8e677d0d8098dc0daed9a2438"
+  },
+  {
+    "path": "14_ARCHITECTURE.md",
+    "bytes": 1368,
+    "sha256": "506958e52ed2f813732f90b0ca426aa601df5f0c8b4a639f25ac7ffbc83120db"
+  },
+  {
+    "path": "15_DEVELOPER_IMPLEMENTATION_ORDER.md",
+    "bytes": 2730,
+    "sha256": "c82e412bad2ddbca21d9fef5b454b145bf02e23a9f65bec360117003de94458d"
+  },
+  {
+    "path": "16_ENV_EXAMPLE",
+    "bytes": 1124,
+    "sha256": "eddf52cd1d30b6d22ddb648e8255063f3405dff3b2d775d79bb14286ea05fbdc"
+  },
+  {
+    "path": "17_docker-compose.yml",
+    "bytes": 378,
+    "sha256": "a9e91a99e01b5ea1f177aa06bd61f139954c2caee427cc6206f8e1157742411e"
+  },
+  {
+    "path": "V2_TO_V3_PRESERVATION_AUDIT.json",
+    "bytes": 1927,
+    "sha256": "1e4317491bd503d77e4fdb9aaba8500e674c5eacc7d93f41db61b14b62d9baa9"
+  },
+  {
+    "path": "evidence/V1B_network_target_300m_weighting.csv",
+    "bytes": 524,
+    "sha256": "4de9bf855f3f903bc774d7769c7d9172217741685776c48ea752e6b0cc9b66c0"
+  },
+  {
+    "path": "evidence/V1B_network_target_radius_weighting_validation.csv",
+    "bytes": 2850,
+    "sha256": "b30ccafe374aec266f8b80467aae1cda92986a9178d6dfddb286db940b87a624"
+  },
+  {
+    "path": "evidence/V1_V6_RESULTS_SUMMARY.md",
+    "bytes": 2068,
+    "sha256": "a1ff17dc3da73b1290e9c2714ed5d88116de4a85c1a3897c09d8f78e564be635"
+  },
+  {
+    "path": "evidence/V1_spatial_weighting_comparison.csv",
+    "bytes": 549,
+    "sha256": "f225fb837b9ca9be7d6cf873534d363f523f42664635c91e654aa7d699a95ffc"
+  },
+  {
+    "path": "evidence/V2_dual_score_aggregation_summary.csv",
+    "bytes": 615,
+    "sha256": "0c08ea04f6f3f63af1360f449728c79ea64b820b2408451c6d7afe458af6a62f"
+  },
+  {
+    "path": "evidence/V2_largest_local_network_disagreements.csv",
+    "bytes": 644652,
+    "sha256": "f1b1c37dddf96f94148ba17b96b54d80df045880e9f44d56ebebaa868b831f48"
+  },
+  {
+    "path": "evidence/V3B_candidate_stale_threshold_impact.csv",
+    "bytes": 166,
+    "sha256": "de4755150725fac0f1ee37a78f4f5ecfd70999b7613086bb7332e273a07439ef"
+  },
+  {
+    "path": "evidence/V3B_sensor_gap_diagnostics.csv",
+    "bytes": 3002,
+    "sha256": "2c5babc68235faab3a228b82a178f73bcfb1f9d514a7bf61fc6efce4e958b8f0"
+  },
+  {
+    "path": "evidence/V3_realtime_sensor_window_matrix.csv",
+    "bytes": 631171,
+    "sha256": "e812f12b4e4d5943e2c9b8bb5173d8d4eec1e783c34ca8761f817ff7d95b2cf7"
+  },
+  {
+    "path": "evidence/V3_realtime_window_presence_summary.csv",
+    "bytes": 4993,
+    "sha256": "09b5988bedb0c5963f786bb48e5b9dfb7bd90514de33780ad64e9c8376df0ed1"
+  },
+  {
+    "path": "evidence/V4B_relocation_phrase_aware_review.csv",
+    "bytes": 801,
+    "sha256": "89a8818ee377360b95e0bb9610dcd1848267dd16f4663713c3ae76bf912ef9e1"
+  },
+  {
+    "path": "evidence/V4_relocation_impact_summary.csv",
+    "bytes": 687,
+    "sha256": "1836f8c1f8e2df98cfef7067d8f34b45bf32c25b74a5c1c40c5a534f2e5c1b18"
+  },
+  {
+    "path": "evidence/V5B_network_temporal_holdout_by_context.csv",
+    "bytes": 3453,
+    "sha256": "c069d3aedecc01ba7c6feea9453963f7f405b7984e6d8691d099fe06a09d35bf"
+  },
+  {
+    "path": "evidence/V5B_network_temporal_holdout_summary.csv",
+    "bytes": 394,
+    "sha256": "b88b43eb28b2d7f16cd26b0d3cd4fd54bd547575492395fa91da64acfbeb0da2"
+  },
+  {
+    "path": "evidence/V5_temporal_holdout_by_group.csv",
+    "bytes": 336802,
+    "sha256": "08f4fb4107c3a036322d5f539037e6ef37b55a40da7c05f94f143bfbccea5d94"
+  },
+  {
+    "path": "evidence/V5_temporal_holdout_summary.csv",
+    "bytes": 408,
+    "sha256": "20d59d2f010e4362ab4f37b33df7fe6afd8f9c0a65bb346adc59a664414aef2c"
+  },
+  {
+    "path": "evidence/V6_landmark_coverage_summary.csv",
+    "bytes": 129,
+    "sha256": "a21f7c476f381f218c9abbb7e08e2f01440651e0796e090007b4bf0a5fd61946"
+  },
+  {
+    "path": "evidence/V6_landmark_outdoor_sensor_coverage.csv",
+    "bytes": 39892,
+    "sha256": "c6c6411457b685698732a17e8638845bf6b562a703067df6540480bb4325e095"
+  },
+  {
+    "path": "fixtures/README.md",
+    "bytes": 409,
+    "sha256": "0d2174dc17d48250ff5b0a2d30c4fb360c847330c95f8173984112fcde0cf34e"
+  },
+  {
+    "path": "fixtures/minute_conflict_example.json",
+    "bytes": 595,
+    "sha256": "1e3230cb1aa71c3866938c218a9410d2992ecb35520c687549e5953ed56cd818"
+  },
+  {
+    "path": "fixtures/point_response_examples.json",
+    "bytes": 887,
+    "sha256": "65e42f17dd724b1e85b0bc9979328db137705555334363d1263f93a7ea3d4842"
+  },
+  {
+    "path": "fixtures/route_evaluation_request.json",
+    "bytes": 443,
+    "sha256": "6dde7548b3bf81b588ff755ac240bd358159d61d8b47b31330683291ad3a23ae"
+  },
+  {
+    "path": "history/00_V2_CHANGELOG_AND_IMPACT.md",
+    "bytes": 6303,
+    "sha256": "ee240a1ea54a9fe3baae329e35c8b348f5c2f44b6c9ae5302abdf4d3603ee01b"
+  },
+  {
+    "path": "validation/validation_tasks.ipynb",
+    "bytes": 3152,
+    "sha256": "acdfbd9d5fd43c219ad7246e9f81aaca5333dbd9bd9b0a93f18879e032a77bd3"
+  }
+]

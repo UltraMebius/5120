@@ -1,11 +1,9 @@
-"""Placeholder interface for future processed pedestrian data access."""
+"""Compatibility boundary for the future PostgreSQL-backed crowd services."""
 
 
 class PedestrianService:
-    """Reserve the pedestrian-data responsibility without assuming a schema."""
+    """Phase 1 placeholder with no ingestion, scoring, or database access."""
 
     def load_processed_data(self) -> None:
-        """Return no data while the final processed dataset is unavailable."""
-        # TODO: Update this interface after the Data Science team provides the final
-        # processed dataset, its format, and documented field definitions.
+        """Preserve the old method until Phase 2 replaces file-based assumptions."""
         return None

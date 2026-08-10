@@ -1,16 +1,30 @@
-# Acceptance Criteria
+# Epic 1 Acceptance Scope
 
 ## User Story 1.1
 
-As a sensory-sensitive commuter, I want to see a sensory indicator for different routes, so that I can choose a less overwhelming route.
+Users can enter a walking origin and destination, select one crowd tolerance,
+compare one to three available route candidates, and see a LOW/MEDIUM/HIGH
+crowd indicator for each route.
 
-## Acceptance Criteria
+## User Story 1.2
 
-1. User can enter an origin and destination.
-2. System can display at least two route options.
-3. Each route can display a LOW, MEDIUM, or HIGH sensory indicator.
-4. A lower-sensory route can be marked as recommended.
+The final backend evaluates high pedestrian-activity exposure and recommends a
+route using the authoritative CalmWay ranking, rather than choosing the
+shortest candidate by default.
 
-## Current Scope Note
+## User Story 1.3
 
-Route results currently use clearly labelled mock data. Real route generation and real pedestrian-data integration will be implemented later. Real sensory calculations will be defined only after the Data Science team provides and documents the processed data.
+During final active navigation, the remaining route is periodically evaluated
+against the latest complete 15-minute crowd window. If upcoming exposure
+exceeds the selected preference, the navigation page shows an alert and offers
+a lower-stimulation route when one is available, or lets the user continue.
+
+## Phase 1 acceptance boundary
+
+Phase 1 establishes the full screen/state flow, typed contracts, configuration,
+backend packages, and explicit preview data. Real Mapbox routes, City data,
+PostGIS scoring, crowd ranking, GPS navigation, periodic evaluation, and
+rerouting are not yet acceptance claims.
+
+Crowd levels are relative pedestrian-activity estimates. They do not represent
+persons/m² density, medical tolerance, or a safety guarantee.

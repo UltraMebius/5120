@@ -1,0 +1,31 @@
+DATABASE_URL=postgresql://epic1:epic1@localhost:5432/epic1
+
+CITY_DATA_BASE_URL=https://data.melbourne.vic.gov.au/api/explore/v2.1
+CITY_MINUTE_DATASET_ID=pedestrian-counting-system-past-hour-counts-per-minute
+CITY_HOURLY_DATASET_ID=pedestrian-counting-system-monthly-counts-per-hour
+CITY_SENSOR_DATASET_ID=pedestrian-counting-system-sensor-locations
+CITY_LANDMARK_DATASET_ID=landmarks-and-places-of-interest-including-schools-theatres-health-services-spor
+
+MINUTE_INGESTION_INTERVAL_MINUTES=15
+
+MAX_SPATIAL_SUPPORT_RADIUS_M=300
+CORE_SPATIAL_SUPPORT_RADIUS_M=250
+SPATIAL_WEIGHT_METHOD=inverse_distance
+SPATIAL_WEIGHT_POWER=1
+SPATIAL_DISTANCE_FLOOR_M=1
+
+CURRENT_CROWD_SCORE_BASIS=current_15m_network_percentile
+LOCAL_CONDITION_BASIS=current_1h_local_historical_percentile
+
+# No sensor-specific no-row stale timer is used.
+# Source/cache stale threshold belongs to deployment monitoring and may be configured separately.
+SOURCE_CACHE_STALE_AFTER_MINUTES=
+
+ROUTE_SAMPLE_INTERVAL_M=50
+
+ORS_API_BASE_URL=https://api.openrouteservice.org
+ORS_API_KEY=
+ORS_PROFILE=foot-walking
+ORS_CANDIDATE_COUNT=3
+
+APP_TIMEZONE=Australia/Melbourne

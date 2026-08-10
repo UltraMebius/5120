@@ -1,0 +1,2 @@
+train_start,train_end,holdout_start,holdout_end,train_rows,holdout_rows,scored_holdout_rows,scored_holdout_pct,holdout_pct_le25,holdout_pct_le50,holdout_pct_le75,holdout_pct_le90,mean_percentile,median_percentile
+2024-08-08,2026-02-07,2026-02-08,2026-08-07,1211133,403318,403318,100.0,25.057150933010675,49.91098835162329,74.34753717909936,90.11945908687437,50.28384274080072,50.12432989931984

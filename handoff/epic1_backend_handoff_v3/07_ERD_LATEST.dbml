@@ -1,0 +1,163 @@
+Table sensor {
+  location_id bigint [pk]
+  first_seen_at timestamptz
+  last_seen_at timestamptz
+}
+
+Table sensor_location_current {
+  location_id bigint [pk, ref: > sensor.location_id]
+  sensor_description text
+  sensor_name text
+  installation_date date
+  note text
+  location_type text
+  status text
+  direction_1_label text
+  direction_2_label text
+  latitude double
+  longitude double
+  geom geography
+  source_updated_at timestamptz
+}
+
+Table pedestrian_hourly_count {
+  location_id bigint [pk, ref: > sensor.location_id]
+  sensing_date date [pk]
+  hour_day smallint [pk]
+  day_type text
+  source_id bigint
+  direction_1 bigint
+  direction_2 bigint
+  total_of_directions bigint
+  source_sensor_name text
+  source_location_text text
+}
+
+Table ingestion_run {
+  ingestion_run_id bigint [pk, increment]
+  source_name text
+  started_at timestamptz
+  finished_at timestamptz
+  status text
+  rows_received bigint
+  rows_inserted bigint
+  rows_skipped_exact_duplicate bigint
+  conflict_groups_detected bigint
+  error_message text
+}
+
+Table pedestrian_minute_observation_raw {
+  minute_record_id bigint [pk, increment]
+  location_id bigint [ref: > sensor.location_id]
+  source_sensing_datetime timestamptz
+  sensing_date_local date
+  sensing_time_local time
+  direction_1 bigint
+  direction_2 bigint
+  total_of_directions bigint
+  payload_hash char(64) [unique]
+  ingestion_run_id bigint [ref: > ingestion_run.ingestion_run_id]
+  ingested_at timestamptz
+}
+
+Table sensor_hour_daytype_baseline {
+  location_id bigint [pk, ref: > sensor.location_id]
+  hour_day smallint [pk]
+  day_type text [pk]
+  observation_count bigint
+  mean_count double
+  median_count double
+  p10 double
+  p20 double
+  p25 double
+  p40 double
+  p50 double
+  p60 double
+  p75 double
+  p80 double
+  p90 double
+  p95 double
+  baseline_start_date date
+  baseline_end_date date
+  calculated_at timestamptz
+}
+
+Table network_hour_daytype_baseline {
+  hour_day smallint [pk]
+  day_type text [pk]
+  observation_count bigint
+  sensor_count bigint
+  mean_count double
+  median_count double
+  p10 double
+  p20 double
+  p25 double
+  p40 double
+  p50 double
+  p60 double
+  p75 double
+  p80 double
+  p90 double
+  p95 double
+  baseline_start_date date
+  baseline_end_date date
+  calculated_at timestamptz
+}
+
+Table current_sensor_activity {
+  location_id bigint [pk, ref: > sensor.location_id]
+  current_15m_window_start timestamptz
+  current_15m_window_end timestamptz
+  current_15m_observed_rows int
+  current_15m_count bigint
+  current_15m_network_percentile double
+  current_crowd_exposure_score double
+  current_crowd_level text
+  comparison_hour_start timestamptz
+  current_1h_observed_rows int
+  current_1h_count bigint
+  current_1h_network_historical_percentile double
+  current_1h_local_historical_percentile double
+  current_local_condition text
+  data_state text
+  calculated_at timestamptz
+}
+
+Table theme {
+  theme_id bigint [pk, increment]
+  theme_name text [unique]
+}
+
+Table sub_theme {
+  sub_theme_id bigint [pk, increment]
+  theme_id bigint [ref: > theme.theme_id]
+  sub_theme_name text
+}
+
+Table landmark {
+  landmark_id bigint [pk, increment]
+  sub_theme_id bigint [ref: > sub_theme.sub_theme_id]
+  feature_name text
+  latitude double
+  longitude double
+  geom geography
+  source_coordinate_text text
+}
+
+Table spatial_activity_cache {
+  spatial_cache_id bigint [pk, increment]
+  calculated_at timestamptz
+  point_latitude double
+  point_longitude double
+  point_geom geography
+  crowd_exposure_score double
+  crowd_level text
+  local_condition_score double
+  local_condition text
+  supporting_sensor_count int
+  nearest_sensor_distance_m double
+  supporting_score_stddev double
+  coverage_status text
+  source_window_start timestamptz
+  source_window_end timestamptz
+}

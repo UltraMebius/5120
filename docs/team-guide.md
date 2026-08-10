@@ -1,38 +1,30 @@
 # Team Guide
 
-## Frontend developers: `frontend/`
+## Frontend: `frontend/`
 
-Typical work:
+- pages own Route Search, Route Options, Navigation, and Arrival;
+- Crowd Alert stays inside Navigation state;
+- Journey Context stores only the current journey;
+- `services/mapbox.ts` is the future Mapbox boundary;
+- never expose a backend Mapbox token through a `VITE_` variable.
 
-- user interface;
-- route search form;
-- route cards and sensory badges; and
-- calls to backend APIs.
+## Backend: `backend/`
 
-## Backend developers: `backend/`
+- `api/` owns HTTP endpoints;
+- `schemas/` owns validated API shapes;
+- `models/` owns domain enums;
+- `services/crowd/` will own the frozen crowd algorithm;
+- `services/routing/` will own Mapbox walking candidates and CalmWay ranking;
+- `services/navigation/` will own remaining-route checks and rerouting;
+- `repositories/` and `db/` will own PostgreSQL/PostGIS access.
 
-Typical work:
+## Data Science handoff
 
-- FastAPI endpoints;
-- service logic; and
-- frontend/backend integration.
+`handoff/epic1_backend_handoff_v3/` is authoritative. Do not replace its
+Network percentile, separate Local Condition, 300 m support limit, normalised
+1/d weighting, no-data rules, P75 route summary, or ranking order.
 
-## Data Science developers: `data/`, `scripts/`, and `backend/app/services/pedestrian_service.py`
+## Tests and documentation
 
-Typical work:
-
-- dataset selection;
-- data cleaning and transformation;
-- processed dataset structure;
-- documentation of fields; and
-- helping the team define sensory thresholds from evidence.
-
-Do not add assumed fields or thresholds before the final dataset is confirmed.
-
-## Testing: `tests/`
-
-Keep tests aligned with implemented behaviour. The current suite covers the health endpoint, mock route endpoint, and temporary sensory placeholder only.
-
-## Documentation: `README.md` and `docs/`
-
-Update setup instructions, architecture, acceptance criteria, and limitations whenever implementation decisions change.
+Keep existing tests passing, add contract tests before implementing later-phase
+algorithm work, and update documentation whenever a preview becomes real.
