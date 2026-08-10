@@ -1,6 +1,6 @@
 # CalmWay Epic 1 Architecture
 
-## Current Phase 3E structure
+## Current Phase 4 structure
 
 ```text
 React Route Search + Mapbox Search Box
@@ -18,12 +18,16 @@ Existing full GeoJSON LineString
   -> RouteCrowdEvaluationService
   -> existing SpatialCrowdService per ordered sample
   -> immutable sample-level crowd results
-  -> future Phase 4 aggregation/ranking boundary
+  -> RouteCrowdRankingService
+  -> configured 55% coverage gate + continuous P75 summary
+  -> soft preference comparison + deterministic lexicographic ranking
+  -> enriched backend-owned route response
+  -> Journey Context preserves backend order and recommendation
 ```
 
 The legacy `GET /api/routes` endpoint remains compatibility preview data, but it
-is not used by the active Route Search flow. Phase 3E evaluates real route
-samples but does not calculate route-level Crowd Exposure or CalmWay ranking.
+is not used by the active Route Search flow. Phase 4 evaluates real route
+samples and calculates request-scoped route Crowd Exposure and CalmWay ranking.
 
 ## Current frontend flow
 
@@ -40,7 +44,7 @@ Future Home
 The frontend stores only small journey state in React Context. Redux is not
 used. Crowd Alert is a state of the Navigation page, not an independent route.
 
-## Next backend/data integration
+## Backend/data integration
 
 ```text
 City of Melbourne APIs
@@ -67,3 +71,4 @@ two responsibilities remain separate.
 - Starting database schema: `handoff/epic1_backend_handoff_v3/05_DATABASE_SCHEMA.sql`
 - Backend API target: `handoff/epic1_backend_handoff_v3/09_INTERNAL_API_OPENAPI.yaml`
 - Product integration plan: `docs/final-epic1-implementation-plan-cn.md`
+- Project-approved Phase 4 policy: `docs/phase4-route-ranking-decisions.md`

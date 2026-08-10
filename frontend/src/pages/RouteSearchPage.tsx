@@ -19,8 +19,8 @@ function RouteSearchPage() {
     setError(null);
 
     try {
-      const routes = await findWalkingRoutes(request);
-      journey.setSearchResults(request, routes);
+      const result = await findWalkingRoutes(request);
+      journey.setSearchResults(request, result);
       navigate("/routes/options");
     } catch {
       console.error("Unable to load walking routes.");
@@ -38,10 +38,10 @@ function RouteSearchPage() {
           <p className="eyebrow">Melbourne CBD · Walking</p>
           <h1>Find a calmer way there</h1>
           <p>
-            Compare real walking distance and estimated time. Your crowd
-            tolerance is saved for later route analysis.
+            Compare real walking routes using current crowd coverage and your
+            selected tolerance.
           </p>
-          <span className="phase-pill">Epic 1 · Phase 3C route visualisation</span>
+          <span className="phase-pill">Epic 1 · Phase 4 route ranking</span>
         </section>
 
         {error && (

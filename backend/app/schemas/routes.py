@@ -4,7 +4,13 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from ..models.crowd import CrowdPreference
+from ..models.crowd import (
+    CrowdLevel,
+    CrowdPreference,
+    FrontendCrowdLevel,
+    RoutePreferenceStatus,
+    RouteRankingStatus,
+)
 
 
 class RouteLocationRequest(BaseModel):
@@ -40,10 +46,33 @@ class WalkingRouteOption(BaseModel):
     durationSeconds: float = Field(ge=0, allow_inf_nan=False)
     geometry: GeoJsonLineString
     steps: list[WalkingRouteStep] = Field(default_factory=list)
+    routeCrowdLevel: CrowdLevel | None = None
+    routeCrowdPresentationLevel: FrontendCrowdLevel | None = None
+    preferenceStatus: RoutePreferenceStatus | None = None
+    supportedPct: float | None = Field(default=None, ge=0, le=100)
+    limitedCoveragePct: float | None = Field(default=None, ge=0, le=100)
+    dataCoveragePct: float | None = Field(default=None, ge=0, le=100)
+    noDataPct: float | None = Field(default=None, ge=0, le=100)
+    medianCrowdExposureScore: float | None = Field(
+        default=None, ge=0, le=100
+    )
+    p75CrowdExposureScore: float | None = Field(
+        default=None, ge=0, le=100
+    )
+    maximumCrowdExposureScore: float | None = Field(
+        default=None, ge=0, le=100
+    )
+    pctAbovePreference: float | None = Field(default=None, ge=0, le=100)
+    pctVeryHigh: float | None = Field(default=None, ge=0, le=100)
+    sampleIntervalM: float | None = Field(default=None, gt=0)
+    sampleCount: int | None = Field(default=None, ge=0)
+    numericSampleCount: int | None = Field(default=None, ge=0)
+    rank: int | None = Field(default=None, ge=1)
+    isRecommended: bool = False
 
 
 class WalkingRoutesResponse(BaseModel):
     preference: CrowdPreference
     routes: list[WalkingRouteOption]
-    recommendedRouteId: None = None
-    rankingStatus: Literal["NOT_EVALUATED"] = "NOT_EVALUATED"
+    recommendedRouteId: str | None = None
+    rankingStatus: RouteRankingStatus = RouteRankingStatus.NOT_EVALUATED

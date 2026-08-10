@@ -1,12 +1,26 @@
 from fastapi.testclient import TestClient
 import pytest
 
-from backend.app.api.routes import get_walking_routing_service
+from backend.app.api.routes import (
+    get_route_crowd_ranking_service,
+    get_walking_routing_service,
+)
 from backend.app.main import app
+from backend.app.models.crowd import (
+    CrowdLevel,
+    FrontendCrowdLevel,
+    RoutePreferenceStatus,
+    RouteRankingStatus,
+)
 from backend.app.schemas.routes import GeoJsonLineString, WalkingRouteOption
 from backend.app.services.routing.mapbox_directions_client import (
     MapboxDirectionsConfigurationError,
     MapboxDirectionsConnectionError,
+)
+from backend.app.services.routing.route_crowd_ranking_service import (
+    RankedRouteCrowdResult,
+    RouteCrowdRankingResult,
+    RouteCrowdSummary,
 )
 
 
@@ -59,9 +73,99 @@ class FailingWalkingRoutingService:
         raise self.error
 
 
+class TwoRouteWalkingRoutingService(FakeWalkingRoutingService):
+    def find_routes(self, **coordinates):
+        first = super().find_routes(**coordinates)[0]
+        second = first.model_copy(
+            update={
+                "id": "mapbox-route-1",
+                "routeIndex": 1,
+                "name": "Alternative route 1",
+                "durationSeconds": 900.0,
+            }
+        )
+        return [first, second]
+
+
+def _summary(
+    route_id: str,
+    *,
+    sufficient: bool = True,
+) -> RouteCrowdSummary:
+    return RouteCrowdSummary(
+        route_id=route_id,
+        supported_pct=100.0 if sufficient else 0.0,
+        limited_coverage_pct=0.0,
+        data_coverage_pct=100.0 if sufficient else 0.0,
+        no_data_pct=0.0 if sufficient else 100.0,
+        sample_interval_m=50.0,
+        sample_count=25,
+        numeric_sample_count=25 if sufficient else 0,
+        median_crowd_exposure_score=40.0 if sufficient else None,
+        p75_crowd_exposure_score=45.0 if sufficient else None,
+        maximum_crowd_exposure_score=50.0 if sufficient else None,
+        pct_above_preference=0.0 if sufficient else None,
+        pct_very_high=0.0 if sufficient else None,
+        route_crowd_level=CrowdLevel.LOW if sufficient else None,
+        route_crowd_presentation_level=(
+            FrontendCrowdLevel.LOW if sufficient else None
+        ),
+        preference_status=(
+            RoutePreferenceStatus.WITHIN_PREFERENCE
+            if sufficient
+            else RoutePreferenceStatus.INSUFFICIENT_DATA
+        ),
+    )
+
+
+class FakeRouteCrowdRankingService:
+    def __init__(self, *, sufficient: bool = True) -> None:
+        self.sufficient = sufficient
+
+    def rank_routes(self, routes, preference):
+        route = routes[0]
+        return RouteCrowdRankingResult(
+            routes=(
+                RankedRouteCrowdResult(
+                    route=route,
+                    summary=_summary(route.id, sufficient=self.sufficient),
+                    rank=1 if self.sufficient else None,
+                    is_recommended=self.sufficient,
+                ),
+            ),
+            recommended_route_id=route.id if self.sufficient else None,
+            ranking_status=(
+                RouteRankingStatus.PROVISIONAL
+                if self.sufficient
+                else RouteRankingStatus.INSUFFICIENT_DATA
+            ),
+        )
+
+
+class ReverseRouteCrowdRankingService:
+    def rank_routes(self, routes, preference):
+        ordered = list(reversed(routes))
+        return RouteCrowdRankingResult(
+            routes=tuple(
+                RankedRouteCrowdResult(
+                    route=route,
+                    summary=_summary(route.id),
+                    rank=index,
+                    is_recommended=index == 1,
+                )
+                for index, route in enumerate(ordered, start=1)
+            ),
+            recommended_route_id=ordered[0].id,
+            ranking_status=RouteRankingStatus.PROVISIONAL,
+        )
+
+
 def test_walking_route_api_returns_normalized_real_route_contract() -> None:
     app.dependency_overrides[get_walking_routing_service] = (
         FakeWalkingRoutingService
+    )
+    app.dependency_overrides[get_route_crowd_ranking_service] = (
+        FakeRouteCrowdRankingService
     )
     try:
         response = TestClient(app).post(
@@ -73,14 +177,79 @@ def test_walking_route_api_returns_normalized_real_route_contract() -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["preference"] == "PREFER_QUIETER"
-    assert body["recommendedRouteId"] is None
-    assert body["rankingStatus"] == "NOT_EVALUATED"
+    assert body["recommendedRouteId"] == "mapbox-route-0"
+    assert body["rankingStatus"] == "PROVISIONAL"
     assert len(body["routes"]) == 1
     route = body["routes"][0]
     assert route["source"] == "MAPBOX"
     assert route["geometry"]["type"] == "LineString"
-    assert "crowdLevel" not in route
-    assert "recommended" not in route
+    assert route["routeCrowdLevel"] == "LOW"
+    assert route["routeCrowdPresentationLevel"] == "LOW"
+    assert route["preferenceStatus"] == "WITHIN_PREFERENCE"
+    assert route["dataCoveragePct"] == 100.0
+    assert route["p75CrowdExposureScore"] == 45.0
+    assert route["rank"] == 1
+    assert route["isRecommended"] is True
+
+
+def test_all_insufficient_routes_return_no_fake_recommendation() -> None:
+    app.dependency_overrides[get_walking_routing_service] = (
+        FakeWalkingRoutingService
+    )
+    app.dependency_overrides[get_route_crowd_ranking_service] = lambda: (
+        FakeRouteCrowdRankingService(sufficient=False)
+    )
+    try:
+        response = TestClient(app).post(
+            "/api/v1/routes/walking", json=VALID_REQUEST
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["rankingStatus"] == "INSUFFICIENT_DATA"
+    assert body["recommendedRouteId"] is None
+    route = body["routes"][0]
+    assert route["preferenceStatus"] == "INSUFFICIENT_DATA"
+    assert route["p75CrowdExposureScore"] is None
+    assert route["routeCrowdLevel"] is None
+    assert route["isRecommended"] is False
+
+
+def test_api_preserves_backend_ranking_order_instead_of_mapbox_order() -> None:
+    app.dependency_overrides[get_walking_routing_service] = (
+        TwoRouteWalkingRoutingService
+    )
+    app.dependency_overrides[get_route_crowd_ranking_service] = (
+        ReverseRouteCrowdRankingService
+    )
+    try:
+        response = TestClient(app).post(
+            "/api/v1/routes/walking", json=VALID_REQUEST
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [route["id"] for route in body["routes"]] == [
+        "mapbox-route-1",
+        "mapbox-route-0",
+    ]
+    assert body["recommendedRouteId"] == "mapbox-route-1"
+
+
+def test_openapi_exposes_all_project_owned_route_ranking_states() -> None:
+    schema = app.openapi()
+    ranking_schema = schema["components"]["schemas"]["RouteRankingStatus"]
+
+    assert ranking_schema["enum"] == [
+        "NOT_EVALUATED",
+        "PROVISIONAL",
+        "INSUFFICIENT_DATA",
+        "VALIDATED",
+    ]
 
 
 @pytest.mark.parametrize(

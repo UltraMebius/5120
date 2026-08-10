@@ -849,6 +849,10 @@ input[aria-invalid="true"] {
     0 14px 34px rgb(39 66 59 / 10%);
 }
 
+.route-card--recommended {
+  border-color: #65a88f;
+}
+
 .route-card__topline {
   display: flex;
   align-items: flex-start;
@@ -886,11 +890,72 @@ input[aria-invalid="true"] {
   white-space: nowrap;
 }
 
+.route-recommendation-label,
+.route-rank-label,
+.crowd-unavailable-label {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 28px;
+  padding: 5px 9px;
+  border: 1px solid #b9d8cb;
+  border-radius: 999px;
+  color: #205f4e;
+  background: #eaf6f1;
+  font-size: 0.68rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.route-rank-label {
+  border-color: #d6e1dc;
+  color: #536963;
+  background: #f5f8f6;
+}
+
+.crowd-unavailable-label {
+  border-color: #e0ddd3;
+  color: #716d62;
+  background: #faf8f1;
+}
+
+.route-card__crowd-analysis {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  padding: 14px;
+  border-radius: 14px;
+  background: #f5f9f7;
+}
+
+.route-card__crowd-analysis strong,
+.route-card__crowd-analysis small {
+  display: block;
+}
+
+.route-card__crowd-analysis strong {
+  color: #30433d;
+  font-size: 0.85rem;
+}
+
+.route-card__crowd-analysis small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.route-card__crowd-analysis .preference-result--above {
+  color: #a14f3a;
+  font-weight: 800;
+}
+
 .route-card__stats {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 15px;
-  margin: 28px 0 24px;
+  margin: 20px 0 24px;
 }
 
 .route-card__stats > div {

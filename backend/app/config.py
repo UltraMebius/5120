@@ -103,10 +103,15 @@ class SpatialSettings:
 
 @dataclass(frozen=True)
 class RouteSettings:
-    """Route sampling plus future scoring/ranking configuration."""
+    """Project-approved MVP route sampling and ranking configuration."""
 
     sample_interval_m: int = field(
         default_factory=lambda: _read_int("ROUTE_SAMPLE_INTERVAL_M", 50)
+    )
+    minimum_crowd_coverage_pct: float = field(
+        default_factory=lambda: _read_float(
+            "MINIMUM_ROUTE_CROWD_COVERAGE_PCT", 55.0
+        )
     )
     summary_method: str = "P75_crowd_exposure_score"
     ranking_order: tuple[str, ...] = (
@@ -115,6 +120,7 @@ class RouteSettings:
         "p75_crowd_exposure_score ASC",
         "maximum_crowd_exposure_score ASC",
         "duration_seconds ASC",
+        "route_index ASC",
     )
 
 

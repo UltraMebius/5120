@@ -16,8 +16,8 @@
 - `models/` owns domain enums;
 - `services/crowd/` will own the frozen crowd algorithm;
 - `services/routing/` owns Mapbox walking candidates, pure uniform sampling,
-  and in-process sample-level crowd evaluation; aggregation and ranking remain
-  later integration work;
+  in-process sample-level crowd evaluation, route aggregation, and backend-only
+  deterministic recommendation ranking;
 - `services/navigation/` will own remaining-route checks and rerouting;
 - `repositories/` and `db/` will own PostgreSQL/PostGIS access.
 
@@ -26,6 +26,8 @@
 `handoff/epic1_backend_handoff_v3/` is authoritative. Do not replace its
 Network percentile, separate Local Condition, 300 m support limit, normalised
 1/d weighting, no-data rules, P75 route summary, or ranking order.
+`docs/phase4-route-ranking-decisions.md` supplements only the product decisions
+that the immutable handoff marked provisional or pending user validation.
 
 ## Tests and documentation
 

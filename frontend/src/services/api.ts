@@ -1,10 +1,18 @@
 import { APP_CONFIG } from "../config";
 import type {
   GeoJsonLineString,
+  RoutePreferenceStatus,
+  RouteRankingStatus,
   WalkingRoute,
   WalkingRouteSearchRequest,
   WalkingRouteStep,
+  WalkingRoutesResult,
 } from "../types/route";
+import type {
+  CrowdPreference,
+  FrontendCrowdLevel,
+  InternalCrowdLevel,
+} from "../types/crowd";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -12,6 +20,56 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isNonNegativeFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+function isPercentage(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    value >= 0 &&
+    value <= 100
+  );
+}
+
+function isNullablePercentage(value: unknown): value is number | null {
+  return value === null || isPercentage(value);
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return Number.isInteger(value) && typeof value === "number" && value >= 0;
+}
+
+function isInternalCrowdLevel(value: unknown): value is InternalCrowdLevel {
+  return ["VERY_LOW", "LOW", "MODERATE", "HIGH", "VERY_HIGH"].includes(
+    value as string,
+  );
+}
+
+function isFrontendCrowdLevel(value: unknown): value is FrontendCrowdLevel {
+  return ["LOW", "MEDIUM", "HIGH"].includes(value as string);
+}
+
+function isCrowdPreference(value: unknown): value is CrowdPreference {
+  return ["AVOID_BUSY", "PREFER_QUIETER", "FLEXIBLE"].includes(
+    value as string,
+  );
+}
+
+function isPreferenceStatus(value: unknown): value is RoutePreferenceStatus {
+  return [
+    "WITHIN_PREFERENCE",
+    "ABOVE_PREFERENCE",
+    "INSUFFICIENT_DATA",
+  ].includes(value as string);
+}
+
+function isRankingStatus(value: unknown): value is RouteRankingStatus {
+  return [
+    "NOT_EVALUATED",
+    "PROVISIONAL",
+    "INSUFFICIENT_DATA",
+    "VALIDATED",
+  ].includes(value as string);
 }
 
 function parseCoordinatePair(
@@ -92,7 +150,36 @@ function parseRoute(value: unknown): WalkingRoute | null {
     value.routeIndex < 0 ||
     !isNonNegativeFiniteNumber(value.distanceMeters) ||
     !isNonNegativeFiniteNumber(value.durationSeconds) ||
-    !Array.isArray(value.steps)
+    !Array.isArray(value.steps) ||
+    !isPercentage(value.supportedPct) ||
+    !isPercentage(value.limitedCoveragePct) ||
+    !isPercentage(value.dataCoveragePct) ||
+    !isPercentage(value.noDataPct) ||
+    !isNullablePercentage(value.medianCrowdExposureScore) ||
+    !isNullablePercentage(value.p75CrowdExposureScore) ||
+    !isNullablePercentage(value.maximumCrowdExposureScore) ||
+    !isNullablePercentage(value.pctAbovePreference) ||
+    !isNullablePercentage(value.pctVeryHigh) ||
+    !isNonNegativeFiniteNumber(value.sampleIntervalM) ||
+    value.sampleIntervalM === 0 ||
+    !isNonNegativeInteger(value.sampleCount) ||
+    !isNonNegativeInteger(value.numericSampleCount) ||
+    !isPreferenceStatus(value.preferenceStatus) ||
+    typeof value.isRecommended !== "boolean" ||
+    !(
+      value.rank === null ||
+      (Number.isInteger(value.rank) &&
+        typeof value.rank === "number" &&
+        value.rank >= 1)
+    ) ||
+    !(
+      value.routeCrowdLevel === null ||
+      isInternalCrowdLevel(value.routeCrowdLevel)
+    ) ||
+    !(
+      value.routeCrowdPresentationLevel === null ||
+      isFrontendCrowdLevel(value.routeCrowdPresentationLevel)
+    )
   ) {
     return null;
   }
@@ -102,20 +189,37 @@ function parseRoute(value: unknown): WalkingRoute | null {
     return null;
   }
   return {
+    dataCoveragePct: value.dataCoveragePct,
     distanceMeters: value.distanceMeters,
     durationSeconds: value.durationSeconds,
     geometry,
     id: value.id,
+    isRecommended: value.isRecommended,
+    limitedCoveragePct: value.limitedCoveragePct,
+    maximumCrowdExposureScore: value.maximumCrowdExposureScore,
+    medianCrowdExposureScore: value.medianCrowdExposureScore,
     name: value.name,
+    noDataPct: value.noDataPct,
+    numericSampleCount: value.numericSampleCount,
+    p75CrowdExposureScore: value.p75CrowdExposureScore,
+    pctAbovePreference: value.pctAbovePreference,
+    pctVeryHigh: value.pctVeryHigh,
+    preferenceStatus: value.preferenceStatus,
+    rank: value.rank,
+    routeCrowdLevel: value.routeCrowdLevel,
+    routeCrowdPresentationLevel: value.routeCrowdPresentationLevel,
     routeIndex: value.routeIndex,
+    sampleCount: value.sampleCount,
+    sampleIntervalM: value.sampleIntervalM,
     source: "MAPBOX",
     steps: steps as WalkingRouteStep[],
+    supportedPct: value.supportedPct,
   };
 }
 
 export async function findWalkingRoutes(
   request: WalkingRouteSearchRequest,
-): Promise<WalkingRoute[]> {
+): Promise<WalkingRoutesResult> {
   const response = await fetch(
     `${APP_CONFIG.apiBaseUrl}/api/v1/routes/walking`,
     {
@@ -147,12 +251,43 @@ export async function findWalkingRoutes(
   } catch {
     throw new Error("Walking routes could not be loaded.");
   }
-  if (!isRecord(body) || !Array.isArray(body.routes) || !body.routes.length) {
+  if (
+    !isRecord(body) ||
+    !Array.isArray(body.routes) ||
+    !body.routes.length ||
+    !isCrowdPreference(body.preference) ||
+    body.preference !== request.preference ||
+    !isRankingStatus(body.rankingStatus) ||
+    !(
+      body.recommendedRouteId === null ||
+      (typeof body.recommendedRouteId === "string" &&
+        body.recommendedRouteId.length > 0)
+    )
+  ) {
     throw new Error("Walking routes could not be loaded.");
   }
   const routes = body.routes.map(parseRoute);
   if (routes.some((route) => route === null)) {
     throw new Error("Walking routes could not be loaded.");
   }
-  return routes as WalkingRoute[];
+  const parsedRoutes = routes as WalkingRoute[];
+  const recommendedRouteId = body.recommendedRouteId;
+  if (
+    (recommendedRouteId !== null &&
+      !parsedRoutes.some((route) => route.id === recommendedRouteId)) ||
+    parsedRoutes.some(
+      (route) => route.isRecommended !== (route.id === recommendedRouteId),
+    ) ||
+    (body.rankingStatus === "PROVISIONAL" && recommendedRouteId === null) ||
+    (body.rankingStatus === "INSUFFICIENT_DATA" &&
+      recommendedRouteId !== null)
+  ) {
+    throw new Error("Walking routes could not be loaded.");
+  }
+  return {
+    preference: body.preference,
+    rankingStatus: body.rankingStatus,
+    recommendedRouteId,
+    routes: parsedRoutes,
+  };
 }

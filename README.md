@@ -1,14 +1,13 @@
 # CalmWay
 
 CalmWay is a responsive walking-route web application for sensory-sensitive
-commuters in Melbourne CBD. The project has completed **Epic 1 Phase 3E**. The
+commuters in Melbourne CBD. The project has completed **Epic 1 Phase 4**. The
 frontend can search for real Mapbox places, request real walking candidates from
 the FastAPI backend, preview each returned LineString on Mapbox GL JS, and reuse
 the selected route on the static Navigation screen. The backend now measures
-and uniformly samples those LineStrings at the configured interval. Each sample
-can now be evaluated in process by the existing Phase 2D crowd point engine.
-Route-level crowd aggregation, preference logic, and ranking are not connected
-yet.
+and uniformly samples those LineStrings at the configured interval, evaluates
+each sample with the Phase 2D crowd point engine, then applies the project-
+approved coverage, P75, preference, and deterministic ranking policy.
 
 ## Current Epic 1 flow
 
@@ -33,7 +32,7 @@ The root route temporarily redirects to Route Search. The Home page belongs to
 another team member; `VITE_HOME_ROUTE` is the integration boundary and no Home
 page is implemented here.
 
-## Implemented through Phase 3E
+## Implemented through Phase 4
 
 - React Router page structure and a small Journey Context;
 - responsive desktop/mobile UI for the complete Epic 1 flow;
@@ -47,6 +46,9 @@ page is implemented here.
   interval, without Mapbox, crowd, database, or frontend coupling;
 - ordered sample-level crowd evaluation by composing the route sampler directly
   with the authoritative PostGIS spatial point service;
+- 55% configurable route coverage gating, continuous-interpolation P75 route
+  scoring, soft tolerance comparison, and deterministic backend ranking;
+- honest insufficient-data route cards and backend-owned CalmWay recommendation;
 - static Navigation maneuver, alert, alternative, and arrival preview states;
 - PostgreSQL/PostGIS ingestion, baselines, current activity, and point-level
   crowd evaluation from Phases 2A–2D.
@@ -55,7 +57,6 @@ page is implemented here.
 
 The application still does **not** perform:
 
-- real candidate-route evaluation and CalmWay ranking;
 - continuous GPS navigation, periodic crowd re-evaluation, or rerouting;
 - deployment.
 
@@ -74,8 +75,9 @@ its algorithm. The frozen contract includes:
 - `SUPPORTED <=250 m`, `LIMITED >250–300 m`, otherwise `NO_DATA`;
 - normalised inverse-distance weighting `1 / max(distance, 1 m)`;
 - 50 m configurable route sampling and P75 route summary;
+- project-approved MVP route evaluation at 55% numeric coverage;
 - route ranking by No Data %, preference exceedance %, P75 exposure, maximum
-  exposure, then duration.
+  exposure, duration, then Mapbox route index.
 
 `NO_DATA` and `AMBIGUOUS_NO_RECORD` must never be converted to LOW or zero.
 These are relative pedestrian-activity estimates, not persons/m², medical, or
@@ -117,7 +119,10 @@ sampling guide](docs/route-sampling-phase3d-cn.md) documents Phase 3D geometry
 measurement, interpolation, endpoint rules, and offline verification. The
 [route sample crowd evaluation guide](docs/route-sample-crowd-evaluation-phase3e-cn.md)
 documents Phase 3E service composition, coverage/null propagation, controlled
-PostGIS testing, and real current-state verification.
+PostGIS testing, and real current-state verification. The [Phase 4 route-ranking
+decision record](docs/phase4-route-ranking-decisions.md) documents coverage,
+continuous P75, tolerance, deterministic tie-breaks, insufficient-data behavior,
+backend recommendation ownership, and reproduction commands.
 
 Use Node.js 20 or newer for the frontend and Python 3.12 (or another compatible
 modern Python 3 release) for the backend.

@@ -51,6 +51,12 @@ with `SpatialCrowdService`, and prints support-state counts plus concise endpoin
 results. `--details` prints every ordered sample. It never refreshes City data,
 calls CalmWay over HTTP, calculates route-level crowd metrics, or writes data.
 
+`evaluate_route_ranking.py` is the read-only Phase 4 end-to-end verifier. It
+fetches real Mapbox walking candidates, reuses Phase 3E sample evaluation, then
+prints only concise route coverage, P75 crowd result, preference state, rank,
+and recommendation. It never refreshes City data, prints credentials, or writes
+route results to the database.
+
 All ingestion and baseline jobs must follow the complete rules in
 `handoff/epic1_backend_handoff_v3/`, including exact-payload deduplication,
 conflict preservation, complete 15-minute windows, relocation restrictions,

@@ -6,16 +6,23 @@ import pytest
 from sqlalchemy import text
 
 from backend.app.db.connection import create_database_engine
+from backend.app.models.crowd import CrowdPreference, RouteRankingStatus
 from backend.app.repositories.spatial_repository import SpatialRepository
+from backend.app.schemas.routes import GeoJsonLineString, WalkingRouteOption
 from backend.app.services.crowd.spatial_crowd_service import SpatialCrowdService
 from backend.app.services.routing.route_crowd_evaluation_service import (
     RouteCrowdEvaluationService,
+)
+from backend.app.services.routing.route_crowd_ranking_service import (
+    RouteCrowdRankingService,
+    continuous_percentile,
 )
 from backend.app.services.routing.route_sampling_service import RouteSamplingService
 
 
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 RUN_ROUTE_CROWD = os.getenv("RUN_ROUTE_CROWD_INTEGRATION", "") == "1"
+RUN_ROUTE_RANKING = os.getenv("RUN_ROUTE_RANKING_INTEGRATION", "") == "1"
 TEST_IDS = (9_998_001, 9_998_002)
 LONGITUDE = 144.2
 LATITUDE = -38.8
@@ -40,13 +47,13 @@ _INTEGRITY_QUERY = text(
 
 
 @pytest.mark.skipif(
-    not DATABASE_URL or not RUN_ROUTE_CROWD,
+    not DATABASE_URL or not (RUN_ROUTE_CROWD or RUN_ROUTE_RANKING),
     reason=(
-        "Set DATABASE_URL and RUN_ROUTE_CROWD_INTEGRATION=1 to run the "
-        "rollback-only route sample crowd integration."
+        "Set DATABASE_URL and RUN_ROUTE_RANKING_INTEGRATION=1 to run the "
+        "rollback-only route crowd/ranking integration."
     ),
 )
-def test_controlled_route_samples_propagate_supported_limited_and_no_data() -> None:
+def test_controlled_route_samples_and_ranking_use_rollback_only_postgis() -> None:
     engine = create_database_engine(DATABASE_URL)
     try:
         with engine.connect() as connection:
@@ -181,10 +188,13 @@ def test_controlled_route_samples_propagate_supported_limited_and_no_data() -> N
                 spatial_service = SpatialCrowdService(
                     SpatialRepository(connection=connection)
                 )
-                evaluation = RouteCrowdEvaluationService(
+                evaluation_service = RouteCrowdEvaluationService(
                     RouteSamplingService(),
                     spatial_service,
-                ).evaluate_geometry(geometry, route_id="controlled-route")
+                )
+                evaluation = evaluation_service.evaluate_geometry(
+                    geometry, route_id="controlled-route"
+                )
 
                 assert evaluation.route_id == "controlled-route"
                 assert evaluation.sample_count == 14
@@ -253,6 +263,42 @@ def test_controlled_route_samples_propagate_supported_limited_and_no_data() -> N
                     and row.local_condition_score is None
                     and row.local_condition is None
                     for row in no_data_rows
+                )
+
+                route = WalkingRouteOption(
+                    id="controlled-route",
+                    routeIndex=0,
+                    name="Controlled walking route",
+                    distanceMeters=evaluation.route_length_meters,
+                    durationSeconds=600.0,
+                    geometry=GeoJsonLineString.model_validate(geometry),
+                )
+                ranking = RouteCrowdRankingService(
+                    evaluation_service,
+                    minimum_coverage_pct=55.0,
+                ).rank_routes(
+                    [route],
+                    CrowdPreference.PREFER_QUIETER,
+                )
+                ranked = ranking.routes[0]
+                eligible_scores = [
+                    row.crowd.crowd_exposure_score
+                    for row in evaluation.sample_results
+                    if row.crowd.coverage_status in ("SUPPORTED", "LIMITED")
+                    and row.crowd.crowd_exposure_score is not None
+                ]
+
+                assert ranking.ranking_status is RouteRankingStatus.PROVISIONAL
+                assert ranking.recommended_route_id == "controlled-route"
+                assert ranked.rank == 1
+                assert ranked.is_recommended is True
+                assert ranked.summary.numeric_sample_count == 9
+                assert ranked.summary.data_coverage_pct == pytest.approx(
+                    100 * 9 / 14
+                )
+                assert ranked.summary.no_data_pct == pytest.approx(100 * 5 / 14)
+                assert ranked.summary.p75_crowd_exposure_score == pytest.approx(
+                    continuous_percentile(eligible_scores, 0.75)
                 )
             finally:
                 transaction.rollback()

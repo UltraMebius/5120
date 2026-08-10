@@ -9,8 +9,10 @@ import {
 import type { CrowdPreference } from "../types/crowd";
 import type {
   JourneyLocation,
+  RouteRankingStatus,
   WalkingRoute,
   WalkingRouteSearchRequest,
+  WalkingRoutesResult,
 } from "../types/route";
 
 interface JourneyState {
@@ -18,6 +20,8 @@ interface JourneyState {
   destination: JourneyLocation | null;
   origin: JourneyLocation | null;
   preference: CrowdPreference;
+  rankingStatus: RouteRankingStatus;
+  recommendedRouteId: string | null;
   routes: WalkingRoute[];
   selectedRoute: WalkingRoute | null;
   startedAt: string | null;
@@ -34,7 +38,7 @@ interface JourneyContextValue extends JourneyState {
   ) => void;
   setSearchResults: (
     request: WalkingRouteSearchRequest,
-    routes: WalkingRoute[],
+    result: WalkingRoutesResult,
   ) => void;
   showAlertPreview: () => void;
   startPreviewAlternative: () => void;
@@ -45,6 +49,8 @@ const INITIAL_STATE: JourneyState = {
   destination: null,
   origin: null,
   preference: "PREFER_QUIETER",
+  rankingStatus: "NOT_EVALUATED",
+  recommendedRouteId: null,
   routes: [],
   selectedRoute: null,
   startedAt: null,
@@ -81,19 +87,23 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
           ...current,
           [field]: location,
           alertVisible: false,
+          rankingStatus: "NOT_EVALUATED",
+          recommendedRouteId: null,
           routes: [],
           selectedRoute: null,
           startedAt: null,
           statusMessage: null,
         }));
       },
-      setSearchResults: (request, routes) => {
+      setSearchResults: (request, result) => {
         setState({
           alertVisible: false,
           destination: request.destination,
           origin: request.origin,
-          preference: request.preference,
-          routes,
+          preference: result.preference,
+          rankingStatus: result.rankingStatus,
+          recommendedRouteId: result.recommendedRouteId,
+          routes: result.routes,
           selectedRoute: null,
           startedAt: null,
           statusMessage: null,
@@ -111,7 +121,7 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
           ...current,
           alertVisible: false,
           statusMessage:
-            "Crowd-based alternatives are not evaluated in this phase.",
+            "Alternative route preview is not available in this static overview.",
         }));
       },
     }),

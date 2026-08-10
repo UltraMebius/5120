@@ -23,6 +23,19 @@ class CrowdPreference(str, Enum):
     FLEXIBLE = "FLEXIBLE"
 
 
+class RoutePreferenceStatus(str, Enum):
+    WITHIN_PREFERENCE = "WITHIN_PREFERENCE"
+    ABOVE_PREFERENCE = "ABOVE_PREFERENCE"
+    INSUFFICIENT_DATA = "INSUFFICIENT_DATA"
+
+
+class RouteRankingStatus(str, Enum):
+    NOT_EVALUATED = "NOT_EVALUATED"
+    PROVISIONAL = "PROVISIONAL"
+    INSUFFICIENT_DATA = "INSUFFICIENT_DATA"
+    VALIDATED = "VALIDATED"
+
+
 class CoverageStatus(str, Enum):
     SUPPORTED = "SUPPORTED"
     LIMITED = "LIMITED"

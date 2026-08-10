@@ -22,6 +22,7 @@ function RouteOptionsPage() {
     journey.origin?.source === "MAPBOX" ? journey.origin : null;
   const mapDestination =
     journey.destination?.source === "MAPBOX" ? journey.destination : null;
+  const hasRecommendation = journey.recommendedRouteId !== null;
 
   useEffect(() => {
     if (
@@ -61,11 +62,19 @@ function RouteOptionsPage() {
 
         <div className="preview-notice">
           <span aria-hidden="true">i</span>
-          <p>
-            <strong>Real Mapbox walking routes.</strong> Distance, duration and
-            route order come from Mapbox. Crowd analysis and recommendation are
-            not connected yet.
-          </p>
+          {journey.rankingStatus === "INSUFFICIENT_DATA" ? (
+            <p>
+              <strong>Current crowd ranking is unavailable.</strong> These real
+              Mapbox walking routes remain available, but none has enough
+              current crowd coverage for a CalmWay recommendation.
+            </p>
+          ) : (
+            <p>
+              <strong>Current crowd-aware comparison.</strong> CalmWay has
+              ordered these routes using the backend&apos;s provisional MVP
+              crowd-ranking policy and your selected tolerance.
+            </p>
+          )}
         </div>
 
         {previewRoute ? (
@@ -79,12 +88,14 @@ function RouteOptionsPage() {
               {journey.routes.map((route) => (
                 <RouteCard
                   isPreviewed={route.id === previewRoute.id}
+                  isRecommended={journey.recommendedRouteId === route.id}
                   key={route.id}
                   onDepart={handleDepart}
                   onPreview={(selectedRoute) =>
                     setPreviewRouteId(selectedRoute.id)
                   }
                   route={route}
+                  toleranceLevel={preference.uiLevel}
                 />
               ))}
             </section>
@@ -124,8 +135,9 @@ function RouteOptionsPage() {
 
         {journey.routes.length > 0 && (
           <p className="crowd-disclaimer crowd-disclaimer--footer">
-            Your crowd tolerance is saved, but it does not reorder routes in
-            this phase. Crowd analysis is coming in a later phase.
+            {hasRecommendation
+              ? "The CalmWay recommendation uses current relative pedestrian activity. The MVP ranking policy is provisional, not a medical or sensory-safety assessment."
+              : "No CalmWay recommendation is shown when current crowd coverage is insufficient. Route distance, duration and geometry remain available."}
           </p>
         )}
       </main>

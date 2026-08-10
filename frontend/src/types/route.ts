@@ -1,4 +1,19 @@
-import type { CrowdPreference } from "./crowd";
+import type {
+  CrowdPreference,
+  FrontendCrowdLevel,
+  InternalCrowdLevel,
+} from "./crowd";
+
+export type RoutePreferenceStatus =
+  | "WITHIN_PREFERENCE"
+  | "ABOVE_PREFERENCE"
+  | "INSUFFICIENT_DATA";
+
+export type RouteRankingStatus =
+  | "NOT_EVALUATED"
+  | "PROVISIONAL"
+  | "INSUFFICIENT_DATA"
+  | "VALIDATED";
 
 export interface Coordinate {
   latitude: number;
@@ -39,14 +54,38 @@ export interface WalkingRouteStep {
 }
 
 export interface WalkingRoute {
+  dataCoveragePct: number;
   distanceMeters: number;
   durationSeconds: number;
   geometry: GeoJsonLineString;
   id: string;
+  isRecommended: boolean;
+  limitedCoveragePct: number;
+  maximumCrowdExposureScore: number | null;
+  medianCrowdExposureScore: number | null;
   name: string;
+  noDataPct: number;
+  numericSampleCount: number;
+  p75CrowdExposureScore: number | null;
+  pctAbovePreference: number | null;
+  pctVeryHigh: number | null;
+  preferenceStatus: RoutePreferenceStatus;
+  rank: number | null;
+  routeCrowdLevel: InternalCrowdLevel | null;
+  routeCrowdPresentationLevel: FrontendCrowdLevel | null;
   routeIndex: number;
+  sampleCount: number;
+  sampleIntervalM: number;
   source: "MAPBOX";
   steps: WalkingRouteStep[];
+  supportedPct: number;
+}
+
+export interface WalkingRoutesResult {
+  preference: CrowdPreference;
+  rankingStatus: RouteRankingStatus;
+  recommendedRouteId: string | null;
+  routes: WalkingRoute[];
 }
 
 export interface WalkingRouteSearchRequest {
