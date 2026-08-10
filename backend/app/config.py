@@ -109,6 +109,27 @@ class RouteSettings:
 
 
 @dataclass(frozen=True)
+class CityDataSettings:
+    """Public City of Melbourne Explore API configuration."""
+
+    base_url: str = field(
+        default_factory=lambda: os.getenv(
+            "CITY_DATA_BASE_URL",
+            "https://data.melbourne.vic.gov.au/api/explore/v2.1",
+        ).rstrip("/")
+    )
+    sensor_dataset_id: str = field(
+        default_factory=lambda: os.getenv(
+            "CITY_SENSOR_DATASET_ID",
+            "pedestrian-counting-system-sensor-locations",
+        )
+    )
+    request_timeout_seconds: float = field(
+        default_factory=lambda: _read_float("CITY_DATA_TIMEOUT_SECONDS", 30.0)
+    )
+
+
+@dataclass(frozen=True)
 class Settings:
     app_title: str = "CalmWay API"
     app_description: str = (
@@ -130,6 +151,7 @@ class Settings:
     )
     spatial: SpatialSettings = field(default_factory=SpatialSettings)
     route: RouteSettings = field(default_factory=RouteSettings)
+    city_data: CityDataSettings = field(default_factory=CityDataSettings)
 
 
 SETTINGS = Settings()

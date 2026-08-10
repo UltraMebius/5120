@@ -7,6 +7,11 @@ score City of Melbourne data.
 check. It verifies connectivity, versions, and the authoritative public tables;
 it never creates schema objects or loads data.
 
+`import_sensor_locations.py` is the Phase 2A-2 current sensor metadata importer.
+Use `--dry-run` to inspect the live City JSON fields and validation result
+without database writes. A normal run transactionally upserts only `sensor` and
+`sensor_location_current`.
+
 Later ingestion and baseline jobs must follow the complete rules in
 `handoff/epic1_backend_handoff_v3/`, including exact-payload deduplication,
 conflict preservation, complete 15-minute windows, relocation restrictions,

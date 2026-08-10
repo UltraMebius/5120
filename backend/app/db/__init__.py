@@ -11,6 +11,7 @@ from .exceptions import (
     DatabaseConnectionError,
     DatabaseQueryError,
     DatabaseSchemaError,
+    DatabaseWriteError,
     PostGISUnavailableError,
 )
 
@@ -20,6 +21,7 @@ __all__ = [
     "DatabaseConnectionError",
     "DatabaseQueryError",
     "DatabaseSchemaError",
+    "DatabaseWriteError",
     "PostGISUnavailableError",
     "create_database_engine",
     "dispose_engine",

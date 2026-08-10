@@ -1,10 +1,10 @@
 # CalmWay
 
 CalmWay is a responsive walking-route web application for sensory-sensitive
-commuters in Melbourne CBD. The project has completed **Epic 1 Phase 2A-1**:
+commuters in Melbourne CBD. The project has completed **Epic 1 Phase 2A-2**:
 the Phase 1 page flow and contracts remain in place, and the FastAPI backend can
-now verify the existing local PostgreSQL/PostGIS schema. Routing, ingestion, and
-crowd-data features remain explicit preview placeholders.
+now verify PostgreSQL/PostGIS and import current official City pedestrian sensor
+locations. Routing, count ingestion, and crowd-data features remain placeholders.
 
 ## Phase 1 flow
 
@@ -47,7 +47,7 @@ page is implemented here.
 
 Phase 1 does **not** perform:
 
-- City of Melbourne data ingestion or baseline calculation;
+- City hourly/minute count ingestion or baseline calculation;
 - current 15-minute Network Crowd Exposure scoring;
 - City data writes, PostGIS spatial scoring, or business-data queries;
 - Mapbox geocoding, maps, or Directions requests;
@@ -91,7 +91,9 @@ for the complete phase plan and scope decisions.
 
 Database access uses SQLAlchemy 2.x with psycopg 3. See the
 [Simplified Chinese database development guide](docs/database-development-cn.md)
-for safe Docker lifecycle, configuration, and verification commands.
+for safe Docker lifecycle, configuration, and verification commands. The
+[sensor-location ingestion guide](docs/sensor-location-ingestion-cn.md) documents
+the live source mapping, dry run, transactional import, and spatial checks.
 
 Use Node.js 20 or newer for the frontend and Python 3.12 (or another compatible
 modern Python 3 release) for the backend.
@@ -133,6 +135,7 @@ From the repository root:
 ```powershell
 .\backend\.venv\Scripts\python.exe -m pytest
 .\backend\.venv\Scripts\python.exe .\scripts\check_database.py
+.\backend\.venv\Scripts\python.exe .\scripts\import_sensor_locations.py --dry-run
 cd frontend
 npm run build
 ```

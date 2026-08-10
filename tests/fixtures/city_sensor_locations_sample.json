@@ -1,0 +1,47 @@
+{
+  "total_count": 3,
+  "results": [
+    {
+      "location_id": 3,
+      "sensor_description": "Melbourne Central",
+      "sensor_name": "Swa295_T",
+      "installation_date": "2009-03-25",
+      "note": null,
+      "location_type": "Outdoor",
+      "status": "A",
+      "direction_1": "North",
+      "direction_2": "South",
+      "latitude": -37.81101524,
+      "longitude": 144.96429485,
+      "location": {"lon": 144.96429485, "lat": -37.81101524}
+    },
+    {
+      "location_id": 9001,
+      "sensor_description": "Inactive fixture sensor",
+      "sensor_name": "Fixture_I",
+      "installation_date": "2020-01-02",
+      "note": "Retained inactive test metadata",
+      "location_type": "Indoor",
+      "status": "I",
+      "direction_1": null,
+      "direction_2": null,
+      "latitude": -37.81,
+      "longitude": 144.96,
+      "location": {"lon": 144.96, "lat": -37.81}
+    },
+    {
+      "location_id": 9002,
+      "sensor_description": "Missing-coordinate fixture sensor",
+      "sensor_name": "Fixture_Missing",
+      "installation_date": null,
+      "note": null,
+      "location_type": "Outdoor",
+      "status": "A",
+      "direction_1": null,
+      "direction_2": null,
+      "latitude": null,
+      "longitude": null,
+      "location": null
+    }
+  ]
+}

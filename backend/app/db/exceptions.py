@@ -17,6 +17,10 @@ class DatabaseQueryError(CalmWayDatabaseError):
     """Raised when a database inspection query cannot be completed."""
 
 
+class DatabaseWriteError(CalmWayDatabaseError):
+    """Raised when a transactional repository write fails."""
+
+
 class PostGISUnavailableError(CalmWayDatabaseError):
     """Raised when the required PostGIS extension cannot be verified."""
 
