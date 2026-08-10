@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from sqlalchemy.exc import SQLAlchemyError
@@ -60,6 +60,36 @@ def test_database_engine_is_lazy_and_normalizes_generic_postgresql_url() -> None
         assert engine.pool.checkedout() == 0
     finally:
         engine.dispose()
+
+
+def test_database_engine_accepts_explicit_psycopg_production_url() -> None:
+    engine = create_database_engine(
+        "postgresql+psycopg://example-user:example-password@"
+        "database.example.invalid/example?sslmode=require"
+    )
+
+    try:
+        assert engine.url.drivername == "postgresql+psycopg"
+        assert engine.url.query["sslmode"] == "require"
+        assert engine.pool.checkedout() == 0
+    finally:
+        engine.dispose()
+
+
+def test_vercel_engine_caps_the_warm_instance_pool(monkeypatch) -> None:
+    monkeypatch.setenv("VERCEL", "1")
+
+    with patch("backend.app.db.connection.create_engine") as mocked_create:
+        create_database_engine(
+            "postgresql+psycopg://example-user:example-password@"
+            "database.example.invalid/example?sslmode=require"
+        )
+
+    _, keyword_arguments = mocked_create.call_args
+    assert keyword_arguments["pool_size"] == 1
+    assert keyword_arguments["max_overflow"] == 0
+    assert keyword_arguments["pool_recycle"] == 300
+    assert keyword_arguments["pool_pre_ping"] is True
 
 
 def test_database_inspection_runs_all_read_only_checks() -> None:

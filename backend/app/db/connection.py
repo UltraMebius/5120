@@ -1,5 +1,6 @@
 """Lazy SQLAlchemy engine lifecycle for PostgreSQL/PostGIS."""
 
+import os
 from threading import Lock
 
 from sqlalchemy import Engine, create_engine
@@ -52,12 +53,21 @@ def create_database_engine(database_url: str | None = None) -> Engine:
     """Build an engine without opening a network connection."""
 
     url = _validated_database_url(database_url)
-    try:
-        return create_engine(
-            url,
-            pool_pre_ping=True,
-            connect_args={"connect_timeout": 5},
+    engine_options: dict[str, object] = {
+        "pool_pre_ping": True,
+        "connect_args": {"connect_timeout": 5},
+    }
+    if os.getenv("VERCEL") == "1":
+        # Retain one reusable connection per warm function instance. This
+        # avoids SQLAlchemy's default five-connection long-lived pool while
+        # leaving connection multiplexing to the configured Neon pooler.
+        engine_options.update(
+            pool_size=1,
+            max_overflow=0,
+            pool_recycle=300,
         )
+    try:
+        return create_engine(url, **engine_options)
     except (ImportError, NoSuchModuleError):
         raise DatabaseConfigurationError(
             "The SQLAlchemy psycopg driver is unavailable. Install the backend "
