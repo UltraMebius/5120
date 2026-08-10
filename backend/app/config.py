@@ -29,6 +29,16 @@ def _read_int(name: str, default: int) -> int:
     return int(raw_value)
 
 
+def _read_optional_positive_int(name: str) -> int | None:
+    raw_value = os.getenv(name)
+    if raw_value is None or not raw_value.strip():
+        return None
+    value = int(raw_value)
+    if value <= 0:
+        raise ValueError(f"{name} must be a positive integer when configured")
+    return value
+
+
 def _read_origins() -> tuple[str, ...]:
     raw_value = os.getenv(
         "FRONTEND_ORIGINS",
@@ -124,6 +134,12 @@ class CityDataSettings:
             "pedestrian-counting-system-sensor-locations",
         )
     )
+    minute_dataset_id: str = field(
+        default_factory=lambda: os.getenv(
+            "CITY_MINUTE_DATASET_ID",
+            "pedestrian-counting-system-past-hour-counts-per-minute",
+        )
+    )
     hourly_dataset_id: str = field(
         default_factory=lambda: os.getenv(
             "CITY_HOURLY_DATASET_ID",
@@ -132,6 +148,22 @@ class CityDataSettings:
     )
     request_timeout_seconds: float = field(
         default_factory=lambda: _read_float("CITY_DATA_TIMEOUT_SECONDS", 30.0)
+    )
+
+
+@dataclass(frozen=True)
+class RealtimeSettings:
+    """Confirmed polling/window settings plus optional operational freshness."""
+
+    minute_ingestion_interval_minutes: int = field(
+        default_factory=lambda: _read_int(
+            "MINUTE_INGESTION_INTERVAL_MINUTES", 15
+        )
+    )
+    source_cache_stale_after_minutes: int | None = field(
+        default_factory=lambda: _read_optional_positive_int(
+            "SOURCE_CACHE_STALE_AFTER_MINUTES"
+        )
     )
 
 
@@ -158,6 +190,7 @@ class Settings:
     spatial: SpatialSettings = field(default_factory=SpatialSettings)
     route: RouteSettings = field(default_factory=RouteSettings)
     city_data: CityDataSettings = field(default_factory=CityDataSettings)
+    realtime: RealtimeSettings = field(default_factory=RealtimeSettings)
 
 
 SETTINGS = Settings()

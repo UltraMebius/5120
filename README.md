@@ -1,11 +1,13 @@
 # CalmWay
 
 CalmWay is a responsive walking-route web application for sensory-sensitive
-commuters in Melbourne CBD. The project has completed **Epic 1 Phase 2B**:
+commuters in Melbourne CBD. The project has completed **Epic 1 Phase 2C**:
 the Phase 1 page flow and contracts remain in place, and the FastAPI backend can
 verify PostgreSQL/PostGIS, import current sensor locations and the frozen hourly
-training window, and transactionally build Local and Network historical
-baselines. Realtime ingestion and current crowd features remain placeholders.
+training window, transactionally build Local and Network historical baselines,
+ingest the bounded official minute feed, and materialise authoritative
+sensor-level current activity. Spatial and route-level crowd features remain
+placeholders.
 
 ## Phase 1 flow
 
@@ -46,11 +48,9 @@ page is implemented here.
 
 ## Not implemented yet
 
-Phase 1 does **not** perform:
+The application still does **not** perform:
 
-- City minute-count ingestion or current crowd calculation;
-- current 15-minute Network Crowd Exposure scoring;
-- City data writes, PostGIS spatial scoring, or business-data queries;
+- PostGIS spatial crowd interpolation or point activity scoring;
 - Mapbox geocoding, maps, or Directions requests;
 - real candidate-route evaluation and CalmWay ranking;
 - continuous GPS navigation, periodic crowd re-evaluation, or rerouting;
@@ -100,6 +100,9 @@ the frozen training-window import, zero-count semantics, unknown IDs, and
 idempotency. The [historical baseline guide](docs/historical-baselines-cn.md)
 documents model eligibility, relocation rules, exact statistics, the baseline
 builder, and database verification.
+The [current activity guide](docs/current-activity-cn.md) documents the bounded
+minute source, missing/conflict semantics, exact windows, dual percentiles,
+manual refresh, and SQL verification.
 
 Use Node.js 20 or newer for the frontend and Python 3.12 (or another compatible
 modern Python 3 release) for the backend.
@@ -144,10 +147,12 @@ From the repository root:
 .\.venv\Scripts\python.exe .\scripts\import_hourly_counts.py --dry-run --start-date 2024-08-10 --end-date 2026-02-07
 .\.venv\Scripts\python.exe .\scripts\build_historical_baselines.py --dry-run
 .\.venv\Scripts\python.exe .\scripts\build_historical_baselines.py
+.\.venv\Scripts\python.exe .\scripts\refresh_current_activity.py --dry-run
+.\.venv\Scripts\python.exe .\scripts\refresh_current_activity.py
 cd frontend
 npm run build
 ```
 
-Later-phase tests for minute ingestion, current crowd scoring, PostGIS route
-support, real route evaluation, GPS progress, and crowd-triggered rerouting are
-intentionally deferred until those features exist.
+Later-phase tests for PostGIS spatial support, real route evaluation, GPS
+progress, and crowd-triggered rerouting are intentionally deferred until those
+features exist.

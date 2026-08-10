@@ -26,7 +26,14 @@ transactionally replaces only `sensor_hour_daytype_baseline` and
 `network_hour_daytype_baseline`, then verifies their keys, statistics, dates,
 relocation rules, zero participation, and logical checksums.
 
-Later ingestion and baseline jobs must follow the complete rules in
+`refresh_current_activity.py` is the manual Phase 2C minute refresh. It fetches
+only the previous complete hour plus the complete current 15-minute window,
+stores exact-new raw payloads, preserves logical conflicts, and transactionally
+replaces only `current_sensor_activity`. Use `--dry-run` for a no-write preview
+and `--as-of` with an offset-aware ISO timestamp for repeatable window checks.
+No scheduler or raw retention deletion is introduced in Phase 2C.
+
+All ingestion and baseline jobs must follow the complete rules in
 `handoff/epic1_backend_handoff_v3/`, including exact-payload deduplication,
 conflict preservation, complete 15-minute windows, relocation restrictions,
 and separate Network and Local percentiles. One-off file processing must not

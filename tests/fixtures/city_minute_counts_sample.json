@@ -1,0 +1,32 @@
+{
+  "total_count": 3,
+  "results": [
+    {
+      "location_id": 11,
+      "sensing_datetime": "2026-08-10T10:15:00+10:00",
+      "sensing_date": "2026-08-10",
+      "sensing_time": "10:15:00",
+      "direction_1": 10,
+      "direction_2": 8,
+      "total_of_directions": 18
+    },
+    {
+      "location_id": 25,
+      "sensing_datetime": "2026-08-10T10:16:00+10:00",
+      "sensing_date": "2026-08-10",
+      "sensing_time": "10:16:00",
+      "direction_1": 0,
+      "direction_2": 0,
+      "total_of_directions": 0
+    },
+    {
+      "location_id": 37,
+      "sensing_datetime": "2026-08-10T10:17:00+10:00",
+      "sensing_date": "2026-08-10",
+      "sensing_time": "10:17:00",
+      "direction_1": null,
+      "direction_2": null,
+      "total_of_directions": 4
+    }
+  ]
+}
