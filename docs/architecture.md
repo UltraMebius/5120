@@ -1,21 +1,22 @@
 # CalmWay Epic 1 Architecture
 
-## Current Phase 1 structure
+## Current Phase 3C structure
 
 ```text
-React Router pages
+React Route Search + Mapbox Search Box
   -> Journey Context
-  -> frontend service boundaries
-  -> FastAPI API
-  -> typed schemas
-  -> crowd / routing / navigation service boundaries
+  -> POST /api/v1/routes/walking
+  -> FastAPI walking routing service
+  -> Mapbox Directions (walking, full GeoJSON)
+  -> Journey Context route candidates
+  -> shared RouteMap on Route Options and Navigation
 ```
 
-The current `GET /api/routes` endpoint and its two route records are explicit
-compatibility preview data. They keep the full UI flow runnable but do not call
-Mapbox, read City data, calculate Crowd Exposure, or rank real routes.
+The legacy `GET /api/routes` endpoint remains compatibility preview data, but it
+is not used by the active Route Search flow. Phase 3C renders real Mapbox route
+geometry without route-level Crowd Exposure or CalmWay ranking.
 
-## Final frontend flow
+## Current frontend flow
 
 ```text
 Future Home
@@ -30,7 +31,7 @@ Future Home
 The frontend stores only small journey state in React Context. Redux is not
 used. Crowd Alert is a state of the Navigation page, not an independent route.
 
-## Final backend/data flow
+## Next backend/data integration
 
 ```text
 City of Melbourne APIs

@@ -1,15 +1,13 @@
 # CalmWay
 
 CalmWay is a responsive walking-route web application for sensory-sensitive
-commuters in Melbourne CBD. The project has completed **Epic 1 Phase 2D**:
-the Phase 1 page flow and contracts remain in place, and the FastAPI backend can
-verify PostgreSQL/PostGIS, import current sensor locations and the frozen hourly
-training window, transactionally build Local and Network historical baselines,
-ingest the bounded official minute feed, materialise authoritative sensor-level
-current activity, and evaluate current crowd evidence at a geographic point
-with PostGIS. Route-level crowd features remain placeholders.
+commuters in Melbourne CBD. The project has completed **Epic 1 Phase 3C**. The
+frontend can search for real Mapbox places, request real walking candidates from
+the FastAPI backend, preview each returned LineString on Mapbox GL JS, and reuse
+the selected route on the static Navigation screen. The Phase 2D crowd point
+engine remains available, but route-level crowd analysis is not connected yet.
 
-## Phase 1 flow
+## Current Epic 1 flow
 
 ```text
 Future Home
@@ -32,31 +30,30 @@ The root route temporarily redirects to Route Search. The Home page belongs to
 another team member; `VITE_HOME_ROUTE` is the integration boundary and no Home
 page is implemented here.
 
-## Implemented in Phase 1
+## Implemented through Phase 3C
 
 - React Router page structure and a small Journey Context;
 - responsive desktop/mobile UI for the complete Epic 1 flow;
-- manual origin/destination fields and one-time browser current-location input;
+- Mapbox Search Box place/POI selection with structured coordinates;
 - single-select LOW/MEDIUM/HIGH crowd preference UI;
-- route options supporting any returned candidate count;
-- active-navigation, alert, alternative, and arrival preview states;
-- FastAPI domain enums, response schemas, service boundaries, and environment
-  configuration;
-- presentation-only mapping from five backend crowd levels to three UI levels;
-- two clearly labelled mock routes through the legacy `GET /api/routes`
-  compatibility endpoint.
+- real Mapbox Directions walking candidates through `POST /api/v1/routes/walking`;
+- route cards supporting the actual returned candidate count;
+- real basemaps, full GeoJSON route lines, endpoint markers, and fitted bounds on
+  Route Options and Navigation;
+- static Navigation maneuver, alert, alternative, and arrival preview states;
+- PostgreSQL/PostGIS ingestion, baselines, current activity, and point-level
+  crowd evaluation from Phases 2A–2D.
 
 ## Not implemented yet
 
 The application still does **not** perform:
 
-- Mapbox geocoding, maps, or Directions requests;
 - real candidate-route evaluation and CalmWay ranking;
 - continuous GPS navigation, periodic crowd re-evaluation, or rerouting;
 - deployment.
 
-The UI preview does not claim live data. Mapbox packages are deferred until
-their first real use; only configuration and service boundaries exist now.
+The Navigation screen is explicitly a static route overview and does not claim
+live user position or route progress.
 
 ## Crowd algorithm source of truth
 
@@ -85,8 +82,8 @@ for the complete phase plan and scope decisions.
 - Frontend: React 18, React Router, Vite, TypeScript
 - Backend: Python 3.12, FastAPI, Pydantic
 - Final data architecture: PostgreSQL + PostGIS
-- Final map/search/routing provider: Mapbox GL JS, Geocoding API v6, Directions
-  API with `mapbox/walking`
+- Map/search/routing provider: Mapbox GL JS, Search Box API, and Directions API
+  with `mapbox/walking`
 - Tests: pytest and FastAPI TestClient
 
 Database access uses SQLAlchemy 2.x with psycopg 3. See the
@@ -105,6 +102,10 @@ manual refresh, and SQL verification.
 The [spatial point engine guide](docs/spatial-crowd-engine-cn.md) documents
 PostGIS neighbour discovery, the adopted 250/300 m support rule, normalised
 inverse-distance weighting, point uncertainty, and manual verification.
+The [Mapbox place-search guide](docs/mapbox-search-phase3a-cn.md),
+[walking-directions guide](docs/mapbox-directions-phase3b-cn.md), and
+[route-visualisation guide](docs/mapbox-route-visualization-phase3c-cn.md)
+document the active Phase 3 frontend/backend route flow.
 
 Use Node.js 20 or newer for the frontend and Python 3.12 (or another compatible
 modern Python 3 release) for the backend.

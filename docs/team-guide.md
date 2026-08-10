@@ -5,7 +5,8 @@
 - pages own Route Search, Route Options, Navigation, and Arrival;
 - Crowd Alert stays inside Navigation state;
 - Journey Context stores only the current journey;
-- `services/mapbox.ts` is the future Mapbox boundary;
+- `services/mapbox.ts` owns browser-safe Mapbox Search Box configuration and
+  place retrieval; `components/map/` owns Mapbox GL JS rendering;
 - never expose a backend Mapbox token through a `VITE_` variable.
 
 ## Backend: `backend/`
@@ -14,7 +15,8 @@
 - `schemas/` owns validated API shapes;
 - `models/` owns domain enums;
 - `services/crowd/` will own the frozen crowd algorithm;
-- `services/routing/` will own Mapbox walking candidates and CalmWay ranking;
+- `services/routing/` owns Mapbox walking candidates; CalmWay route sampling
+  and ranking remain later integration work;
 - `services/navigation/` will own remaining-route checks and rerouting;
 - `repositories/` and `db/` will own PostgreSQL/PostGIS access.
 

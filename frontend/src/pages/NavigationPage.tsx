@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 
 import CrowdAlertPanel from "../components/crowd/CrowdAlertPanel";
-import NavigationMapPreview from "../components/map/NavigationMapPreview";
+import RouteMap from "../components/map/RouteMap";
 import { useJourney } from "../context/JourneyContext";
 import {
   formatWalkingDistance,
@@ -36,6 +36,10 @@ function NavigationPage() {
     instruction: "Continue along the selected walking route",
     maneuverLocation: null,
   };
+  const mapOrigin =
+    journey.origin?.source === "MAPBOX" ? journey.origin : null;
+  const mapDestination =
+    journey.destination.source === "MAPBOX" ? journey.destination : null;
 
   return (
     <div className="navigation-page">
@@ -58,7 +62,12 @@ function NavigationPage() {
       </header>
 
       <main className="navigation-main">
-        <NavigationMapPreview />
+        <RouteMap
+          destination={mapDestination}
+          origin={mapOrigin}
+          route={route}
+          variant="navigation"
+        />
 
         <section className="maneuver-card" aria-label="Next walking direction">
           <div className="maneuver-card__arrow" aria-hidden="true">
@@ -83,22 +92,9 @@ function NavigationPage() {
             <span className="crowd-pending-label">Crowd analysis pending</span>
           </div>
 
-          <div className="progress-block">
-            <div className="progress-block__labels">
-              <span>Route progress</span>
-              <strong>Preview</strong>
-            </div>
-            <div
-              aria-label="Route progress is a navigation preview"
-              className="progress-track"
-              role="progressbar"
-              aria-valuemax={100}
-              aria-valuemin={0}
-              aria-valuenow={28}
-            >
-              <span style={{ width: "28%" }} />
-            </div>
-          </div>
+          <p className="navigation-preview-note">
+            Static route overview — live location and progress are not tracked.
+          </p>
 
           {journey.statusMessage && (
             <p className="navigation-message" role="status">
@@ -109,8 +105,8 @@ function NavigationPage() {
           <details className="preview-controls">
             <summary>Later-phase UI previews</summary>
             <p>
-              Navigation remains a placeholder. No live GPS, route drawing or
-              crowd re-evaluation has occurred.
+              Navigation is a static preview of the selected Mapbox route. No
+              live GPS, route progress or crowd re-evaluation has occurred.
             </p>
             <div>
               <button

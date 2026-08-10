@@ -41,7 +41,7 @@ function RouteSearchPage() {
             Compare real walking distance and estimated time. Your crowd
             tolerance is saved for later route analysis.
           </p>
-          <span className="phase-pill">Epic 1 · Phase 3B real directions</span>
+          <span className="phase-pill">Epic 1 · Phase 3C route visualisation</span>
         </section>
 
         {error && (

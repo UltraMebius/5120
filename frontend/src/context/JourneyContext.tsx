@@ -111,7 +111,7 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
           ...current,
           alertVisible: false,
           statusMessage:
-            "Crowd-based alternatives are not evaluated in Phase 3B.",
+            "Crowd-based alternatives are not evaluated in this phase.",
         }));
       },
     }),

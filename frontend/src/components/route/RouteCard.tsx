@@ -5,13 +5,22 @@ import {
 } from "../../utils/formatRoute";
 
 interface RouteCardProps {
+  isPreviewed: boolean;
   onDepart: (route: WalkingRoute) => void;
+  onPreview: (route: WalkingRoute) => void;
   route: WalkingRoute;
 }
 
-function RouteCard({ onDepart, route }: RouteCardProps) {
+function RouteCard({
+  isPreviewed,
+  onDepart,
+  onPreview,
+  route,
+}: RouteCardProps) {
   return (
-    <article className="route-card">
+    <article
+      className={`route-card${isPreviewed ? " route-card--previewed" : ""}`}
+    >
       <div className="route-card__topline">
         <div>
           <span className="route-source-label">Mapbox walking</span>
@@ -41,14 +50,24 @@ function RouteCard({ onDepart, route }: RouteCardProps) {
         </div>
       </div>
 
-      <button
-        className="button button--secondary button--full"
-        onClick={() => onDepart(route)}
-        type="button"
-      >
-        Depart
-        <span aria-hidden="true">→</span>
-      </button>
+      <div className="route-card__actions">
+        <button
+          aria-pressed={isPreviewed}
+          className="button button--secondary"
+          onClick={() => onPreview(route)}
+          type="button"
+        >
+          {isPreviewed ? "Shown on map" : "Preview on map"}
+        </button>
+        <button
+          className="button button--primary"
+          onClick={() => onDepart(route)}
+          type="button"
+        >
+          Depart
+          <span aria-hidden="true">→</span>
+        </button>
+      </div>
     </article>
   );
 }
