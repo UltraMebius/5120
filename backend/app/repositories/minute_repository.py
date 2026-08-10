@@ -3,6 +3,7 @@
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
+import logging
 from typing import Any
 
 from sqlalchemy import (
@@ -24,13 +25,14 @@ from sqlalchemy import (
     update,
 )
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from ..db.connection import get_database_engine
 from ..db.exceptions import DatabaseQueryError, DatabaseWriteError
 from ..models.minute import MinuteObservation
 
 
+_LOGGER = logging.getLogger(__name__)
 _metadata = MetaData()
 _sensor = Table("sensor", _metadata, Column("location_id", BigInteger))
 _run = Table(
@@ -63,6 +65,49 @@ _minute = Table(
     Column("ingestion_run_id", BigInteger),
     Column("ingested_at", DateTime(timezone=True)),
 )
+
+
+def _integrity_sqlstate(error: SQLAlchemyError) -> str | None:
+    """Return only a validated PostgreSQL SQLSTATE for an integrity failure."""
+
+    if not isinstance(error, IntegrityError):
+        return None
+    original = getattr(error, "orig", None)
+    for attribute in ("sqlstate", "pgcode"):
+        value = getattr(original, attribute, None)
+        if not isinstance(value, str):
+            continue
+        normalized = value.strip().upper()
+        if (
+            len(normalized) == 5
+            and normalized.isascii()
+            and normalized.isalnum()
+        ):
+            return normalized
+    return None
+
+
+def _log_database_write_failure(
+    operation: str,
+    error: SQLAlchemyError,
+) -> None:
+    """Log a bounded operation/type diagnostic without DB error contents."""
+
+    exception_type = type(error).__name__
+    sqlstate = _integrity_sqlstate(error)
+    if sqlstate is None:
+        _LOGGER.error(
+            "database_operation=%s db_exception_type=%s",
+            operation,
+            exception_type,
+        )
+        return
+    _LOGGER.error(
+        "database_operation=%s db_exception_type=%s sqlstate=%s",
+        operation,
+        exception_type,
+        sqlstate,
+    )
 
 
 @dataclass(frozen=True)
@@ -160,8 +205,10 @@ class MinuteRepository:
     ) -> MinuteWriteResult:
         database_engine = self.engine or get_database_engine()
         location_ids = {row.location_id for row in observations}
+        database_operation = "open_minute_ingestion_transaction"
         try:
             with database_engine.begin() as connection:
+                database_operation = "select_known_sensor_ids"
                 known_ids = {
                     int(value)
                     for value in connection.execute(
@@ -175,6 +222,7 @@ class MinuteRepository:
                     row for row in observations if row.location_id in known_ids
                 ]
 
+                database_operation = "insert_ingestion_run"
                 run_id = int(
                     connection.execute(
                         postgresql_insert(_run)
@@ -191,6 +239,7 @@ class MinuteRepository:
                 unique_by_hash = {row.payload_hash: row for row in eligible}
                 inserted_hashes: tuple[str, ...] = ()
                 if unique_by_hash:
+                    database_operation = "insert_raw_minute_observations"
                     insert_statement = (
                         postgresql_insert(_minute)
                         .values(
@@ -223,6 +272,7 @@ class MinuteRepository:
                         ).scalars()
                     )
 
+                database_operation = "count_minute_conflict_groups"
                 conflict_groups = int(
                     connection.execute(
                         text(
@@ -240,6 +290,7 @@ class MinuteRepository:
                     ).scalar_one()
                 )
                 exact_skipped = len(eligible) - len(inserted_hashes)
+                database_operation = "update_ingestion_run"
                 connection.execute(
                     update(_run)
                     .where(_run.c.ingestion_run_id == run_id)
@@ -251,7 +302,9 @@ class MinuteRepository:
                         conflict_groups_detected=conflict_groups,
                     )
                 )
-        except SQLAlchemyError:
+                database_operation = "commit_minute_ingestion_transaction"
+        except SQLAlchemyError as exc:
+            _log_database_write_failure(database_operation, exc)
             raise DatabaseWriteError(
                 "Minute ingestion failed; the raw rows and run ledger were "
                 "rolled back together."

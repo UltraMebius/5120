@@ -62,8 +62,17 @@ current_activity_refresh_failed refresh_stage=<stage> exception_type=<class>
 
 stage 可定位 window 计算、City 分页、转换、sensor reconciliation、raw
 持久化、计算区间读取、current activity materialization、最终事务 commit 或
-结果汇总。日志不记录 exception message、traceback、SQL、连接串、
-Authorization header 或任何 secret。
+结果汇总。若 raw 持久化捕获 SQLAlchemy 数据库异常，还会另记一条更窄的
+诊断：
+
+```text
+database_operation=<static_operation> db_exception_type=<class>
+```
+
+`database_operation` 只使用代码内的静态名称。仅当类型是 `IntegrityError`
+且驱动提供合法 PostgreSQL SQLSTATE 时，该行可以追加五字符
+`sqlstate=<code>`。日志不记录 exception message、traceback、SQL、参数、
+raw record、连接串、Authorization header 或任何 secret。
 
 刷新内的数据库 checkout 全部按顺序完成：每个 repository 的
 `connect()/begin()` 离开 context 后，下一步才申请连接。因此 Vercel 的单连接
