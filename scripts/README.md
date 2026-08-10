@@ -57,6 +57,12 @@ prints only concise route coverage, P75 crowd result, preference state, rank,
 and recommendation. It never refreshes City data, prints credentials, or writes
 route results to the database.
 
+`evaluate_route_crowd_alert.py` is the offline Phase 5B-1 decision-engine
+demonstration. It passes controlled in-memory Phase 3E-like evaluations into the
+pure look-ahead service and verifies one `ALERT`, one `CLEAR`, and one
+`INSUFFICIENT_DATA` result. It does not use GPS, Mapbox, City APIs, HTTP, or the
+database.
+
 All ingestion and baseline jobs must follow the complete rules in
 `handoff/epic1_backend_handoff_v3/`, including exact-payload deduplication,
 conflict preservation, complete 15-minute windows, relocation restrictions,

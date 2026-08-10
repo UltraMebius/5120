@@ -125,6 +125,22 @@ class RouteSettings:
 
 
 @dataclass(frozen=True)
+class RouteAlertSettings:
+    """Project-approved Phase 5B alert-decision configuration."""
+
+    look_ahead_distance_m: float = field(
+        default_factory=lambda: _read_float(
+            "ROUTE_ALERT_LOOK_AHEAD_DISTANCE_M", 300.0
+        )
+    )
+    required_consecutive_samples: int = field(
+        default_factory=lambda: _read_int(
+            "ROUTE_ALERT_REQUIRED_CONSECUTIVE_SAMPLES", 2
+        )
+    )
+
+
+@dataclass(frozen=True)
 class CityDataSettings:
     """Public City of Melbourne Explore API configuration."""
 
@@ -215,6 +231,9 @@ class Settings:
     )
     spatial: SpatialSettings = field(default_factory=SpatialSettings)
     route: RouteSettings = field(default_factory=RouteSettings)
+    route_alert: RouteAlertSettings = field(
+        default_factory=RouteAlertSettings
+    )
     city_data: CityDataSettings = field(default_factory=CityDataSettings)
     realtime: RealtimeSettings = field(default_factory=RealtimeSettings)
 

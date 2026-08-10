@@ -28,6 +28,8 @@ def test_phase_one_defaults_preserve_handoff_configuration() -> None:
     assert SETTINGS.spatial.distance_floor_m == 1
     assert SETTINGS.route.sample_interval_m == 50
     assert SETTINGS.route.minimum_crowd_coverage_pct == 55
+    assert SETTINGS.route_alert.look_ahead_distance_m == 300
+    assert SETTINGS.route_alert.required_consecutive_samples == 2
     assert SETTINGS.route.summary_method == "P75_crowd_exposure_score"
     assert SETTINGS.route.ranking_order == (
         "no_data_pct ASC",

@@ -1,7 +1,7 @@
 # CalmWay
 
 CalmWay is a responsive walking-route web application for sensory-sensitive
-commuters in Melbourne CBD. The project has completed **Epic 1 Phase 5A**. The
+commuters in Melbourne CBD. The project has completed **Epic 1 Phase 5B-1**. The
 frontend can use a one-shot browser geolocation or search for a real Mapbox
 starting point, request real walking candidates from the FastAPI backend,
 preview each returned LineString on Mapbox GL JS, and reuse the selected route
@@ -9,6 +9,8 @@ on the static Navigation screen. The backend measures
 and uniformly samples those LineStrings at the configured interval, evaluates
 each sample with the Phase 2D crowd point engine, then applies the project-
 approved coverage, P75, preference, and deterministic ranking policy.
+An offline domain service can now decide whether current sample-level evidence
+contains a qualifying above-preference streak in the next configured 300 m.
 
 ## Current Epic 1 flow
 
@@ -33,7 +35,7 @@ The root route temporarily redirects to Route Search. The Home page belongs to
 another team member; `VITE_HOME_ROUTE` is the integration boundary and no Home
 page is implemented here.
 
-## Implemented through Phase 5A
+## Implemented through Phase 5B-1
 
 - React Router page structure and a small Journey Context;
 - responsive desktop/mobile UI for the complete Epic 1 flow;
@@ -51,6 +53,8 @@ page is implemented here.
 - 55% configurable route coverage gating, continuous-interpolation P75 route
   scoring, soft tolerance comparison, and deterministic backend ranking;
 - honest insufficient-data route cards and backend-owned CalmWay recommendation;
+- a pure, deterministic ahead-of-route `ALERT` / `CLEAR` /
+  `INSUFFICIENT_DATA` decision engine with explicit partial-data diagnostics;
 - static Navigation maneuver, alert, alternative, and arrival preview states;
 - PostgreSQL/PostGIS ingestion, baselines, current activity, and point-level
   crowd evaluation from Phases 2A–2D.
@@ -60,6 +64,7 @@ page is implemented here.
 The application still does **not** perform:
 
 - continuous GPS navigation, periodic crowd re-evaluation, or rerouting;
+- frontend crowd-alert presentation or alternative-route switching;
 - deployment.
 
 The Navigation screen is explicitly a static route overview and does not claim
@@ -128,6 +133,10 @@ backend recommendation ownership, and reproduction commands.
 The [Phase 5A geolocation-origin guide](docs/geolocation-origin-phase5a-cn.md)
 documents the one-shot permission flow, source model, privacy boundary, HTTPS
 requirement, and real/simulated browser checks.
+The [Phase 5B-1 decision record](docs/phase5b-crowd-alert-decisions.md) and
+[Simplified Chinese implementation guide](docs/route-crowd-alert-phase5b1-cn.md)
+document the provisional 300 m/two-consecutive-sample heuristic, decision
+semantics, diagnostics, and static-navigation boundary.
 
 Use Node.js 20 or newer for the frontend and Python 3.12 (or another compatible
 modern Python 3 release) for the backend.
@@ -175,6 +184,7 @@ From the repository root:
 .\.venv\Scripts\python.exe .\scripts\refresh_current_activity.py --dry-run
 .\.venv\Scripts\python.exe .\scripts\refresh_current_activity.py
 .\.venv\Scripts\python.exe .\scripts\evaluate_crowd_point.py --longitude 144.96 --latitude -37.81
+.\.venv\Scripts\python.exe .\scripts\evaluate_route_crowd_alert.py
 cd frontend
 npm run build
 ```
