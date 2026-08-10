@@ -1,7 +1,10 @@
 """One bounded City-to-raw-to-current refresh, with a read-only dry-run path."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
+import logging
+from typing import TypeVar
 
 from ...models.minute import MinuteObservation
 from ...repositories.current_activity_repository import CurrentActivityRepository
@@ -13,6 +16,28 @@ from ..crowd.current_activity_service import (
 )
 from .city_minute_client import CityMinuteCountClient, CityMinuteSnapshot
 from .minute_ingestion import MinuteTransformResult, transform_minute_records
+
+
+_LOGGER = logging.getLogger(__name__)
+_ResultT = TypeVar("_ResultT")
+
+
+def _run_diagnostic_stage(
+    stage: str,
+    operation: Callable[[], _ResultT],
+) -> _ResultT:
+    """Log only a safe stage and exception class before preserving the error."""
+
+    try:
+        return operation()
+    except Exception as exc:
+        _LOGGER.error(
+            "current_activity_refresh_failed "
+            "refresh_stage=%s exception_type=%s",
+            stage,
+            type(exc).__name__,
+        )
+        raise
 
 
 @dataclass(frozen=True)
@@ -100,25 +125,43 @@ class CurrentActivityRefreshService:
     def refresh(
         self, *, as_of: datetime, dry_run: bool = False
     ) -> CurrentActivityRefreshResult:
-        windows = calculate_windows(
-            as_of,
-            timezone_name=self.activity_service.timezone_name,
-            window_minutes=self.activity_service.window_minutes,
+        windows = _run_diagnostic_stage(
+            "discover_window",
+            lambda: calculate_windows(
+                as_of,
+                timezone_name=self.activity_service.timezone_name,
+                window_minutes=self.activity_service.window_minutes,
+            ),
         )
         fetch_start = min(windows.comparison_start, windows.current_start)
-        snapshot = self.client.fetch_snapshot(
-            start=fetch_start,
-            end=windows.current_end,
+        snapshot = _run_diagnostic_stage(
+            "fetch_pages",
+            lambda: self.client.fetch_snapshot(
+                start=fetch_start,
+                end=windows.current_end,
+            ),
         )
-        transformed = transform_minute_records(snapshot.records, as_of=as_of)
+        transformed = _run_diagnostic_stage(
+            "transform",
+            lambda: transform_minute_records(
+                snapshot.records,
+                as_of=as_of,
+            ),
+        )
         observations = transformed.observations
-        unknown_ids = self.minute_repository.find_unknown_sensor_ids(
-            {row.location_id for row in observations}
+        unknown_ids = _run_diagnostic_stage(
+            "reconcile_sensors",
+            lambda: self.minute_repository.find_unknown_sensor_ids(
+                {row.location_id for row in observations}
+            ),
         )
 
         if dry_run:
-            existing = self.minute_repository.load_observations(
-                start=fetch_start, end=windows.current_end
+            existing = _run_diagnostic_stage(
+                "load_calculation_interval",
+                lambda: self.minute_repository.load_observations(
+                    start=fetch_start, end=windows.current_end
+                ),
             )
             known_candidates = tuple(
                 row for row in observations if row.location_id not in unknown_ids
@@ -141,49 +184,67 @@ class CurrentActivityRefreshService:
                 conflict_groups=conflict_groups,
             )
         else:
-            write = self.minute_repository.ingest(
-                observations,
-                source_name=self.SOURCE_NAME,
-                rows_received=snapshot.total_count,
-                interval_start=fetch_start,
-                interval_end=windows.current_end,
-                metadata={
-                    "requested_start": snapshot.requested_start.isoformat(),
-                    "requested_end": snapshot.requested_end.isoformat(),
-                    "source_minimum_datetime": (
-                        snapshot.source_minimum_datetime.isoformat()
-                        if snapshot.source_minimum_datetime
-                        else None
-                    ),
-                    "source_latest_datetime": (
-                        snapshot.source_latest_datetime.isoformat()
-                        if snapshot.source_latest_datetime
-                        else None
-                    ),
-                    "source_records_before_end": (
-                        snapshot.source_records_before_end
-                    ),
-                    "invalid_record_count": transformed.invalid_record_count,
-                    "invalid_reasons": dict(transformed.invalid_reasons),
-                    "unknown_sensor_ids": sorted(unknown_ids),
-                },
+            write = _run_diagnostic_stage(
+                "persist_raw",
+                lambda: self.minute_repository.ingest(
+                    observations,
+                    source_name=self.SOURCE_NAME,
+                    rows_received=snapshot.total_count,
+                    interval_start=fetch_start,
+                    interval_end=windows.current_end,
+                    metadata={
+                        "requested_start": snapshot.requested_start.isoformat(),
+                        "requested_end": snapshot.requested_end.isoformat(),
+                        "source_minimum_datetime": (
+                            snapshot.source_minimum_datetime.isoformat()
+                            if snapshot.source_minimum_datetime
+                            else None
+                        ),
+                        "source_latest_datetime": (
+                            snapshot.source_latest_datetime.isoformat()
+                            if snapshot.source_latest_datetime
+                            else None
+                        ),
+                        "source_records_before_end": (
+                            snapshot.source_records_before_end
+                        ),
+                        "invalid_record_count": (
+                            transformed.invalid_record_count
+                        ),
+                        "invalid_reasons": dict(transformed.invalid_reasons),
+                        "unknown_sensor_ids": sorted(unknown_ids),
+                    },
+                ),
             )
             raw_summary = self._write_summary(write)
-            calculation_rows = self.minute_repository.load_observations(
-                start=fetch_start, end=windows.current_end
+            calculation_rows = _run_diagnostic_stage(
+                "load_calculation_interval",
+                lambda: self.minute_repository.load_observations(
+                    start=fetch_start, end=windows.current_end
+                ),
             )
 
-        sensors = self.current_repository.load_current_sensors()
-        activity = self.activity_service.build(
-            sensors=sensors,
-            observations=calculation_rows,
-            as_of=as_of,
-            source_latest_datetime=snapshot.source_latest_datetime,
+        sensors = _run_diagnostic_stage(
+            "materialize_current_activity",
+            self.current_repository.load_current_sensors,
         )
+        activity = _run_diagnostic_stage(
+            "materialize_current_activity",
+            lambda: self.activity_service.build(
+                sensors=sensors,
+                observations=calculation_rows,
+                as_of=as_of,
+                source_latest_datetime=snapshot.source_latest_datetime,
+            ),
+        )
+
         rows_written = 0
         if not dry_run:
-            rows_written = self.current_repository.replace_current_activity(
-                activity.records
+            rows_written = _run_diagnostic_stage(
+                "commit",
+                lambda: self.current_repository.replace_current_activity(
+                    activity.records
+                ),
             )
 
         source_minimum = min(

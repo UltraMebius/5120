@@ -52,6 +52,25 @@ historical baseline 比较与 `current_sensor_activity` 事务替换逻辑没有
 普通同步 Vercel Function 请求；service 和 HTTP client 只可能在 warm
 instance 内复用，正确性不依赖实例常驻。
 
+## 生产故障诊断
+
+HTTP 失败响应继续只返回固定的 503 文本。服务器端只记录：
+
+```text
+current_activity_refresh_failed refresh_stage=<stage> exception_type=<class>
+```
+
+stage 可定位 window 计算、City 分页、转换、sensor reconciliation、raw
+持久化、计算区间读取、current activity materialization、最终事务 commit 或
+结果汇总。日志不记录 exception message、traceback、SQL、连接串、
+Authorization header 或任何 secret。
+
+刷新内的数据库 checkout 全部按顺序完成：每个 repository 的
+`connect()/begin()` 离开 context 后，下一步才申请连接。因此 Vercel 的单连接
+QueuePool 足以执行一个 refresh，不需要扩大长期连接池。City 分页同样是顺序
+请求并严格检查每页 `total_count`；任一后续页失败都会中止整个 snapshot，当前
+没有自动 retry，以免掩盖不完整或变化中的 source snapshot。
+
 ## 后续 GitHub Actions 调用
 
 Phase 7D-2 将配置 GitHub Actions 每 15 分钟发起一次带 Bearer header 的
