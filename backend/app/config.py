@@ -2,6 +2,17 @@
 
 from dataclasses import dataclass, field
 import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+# Process environment variables keep precedence. Support either documented local
+# location without requiring callers to start Python from a particular directory.
+load_dotenv(_PROJECT_ROOT / "backend" / ".env", override=False)
+load_dotenv(_PROJECT_ROOT / ".env", override=False)
 
 
 def _read_float(name: str, default: float) -> float:
@@ -101,7 +112,7 @@ class RouteSettings:
 class Settings:
     app_title: str = "CalmWay API"
     app_description: str = (
-        "Phase 1 API scaffold for CalmWay crowd-aware walking routes."
+        "CalmWay API for crowd-aware walking routes."
     )
     app_timezone: str = field(
         default_factory=lambda: os.getenv("APP_TIMEZONE", "Australia/Melbourne")

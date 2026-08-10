@@ -1,1 +1,1 @@
-"""PostgreSQL/PostGIS repository boundary; no database access in Phase 1."""
+"""SQL repository boundary for the authoritative PostgreSQL/PostGIS schema."""

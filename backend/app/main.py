@@ -19,5 +19,5 @@ app.include_router(routes_router, prefix="/api")
 
 @app.get("/health", tags=["health"])
 def health_check() -> dict[str, str]:
-    """Return a small readiness response for local development."""
+    """Return liveness; database readiness is verified separately."""
     return {"status": "ok"}
