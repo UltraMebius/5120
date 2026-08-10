@@ -13,15 +13,15 @@ function AppHeader({ backLabel, backTo }: AppHeaderProps) {
       <div className="app-header__inner">
         {backTo ? (
           <Link className="back-link" to={backTo}>
-            <span aria-hidden="true">←</span> {backLabel ?? "Back"}
+            <span aria-hidden="true">&larr;</span> {backLabel ?? "Back"}
           </Link>
         ) : (
-          <a className="back-link" href={APP_CONFIG.homeRoute}>
-            <span aria-hidden="true">←</span> Back to Home
-          </a>
+          <Link className="back-link" to={APP_CONFIG.homeRoute}>
+            <span aria-hidden="true">&larr;</span> Back to Home
+          </Link>
         )}
 
-        <Link className="brand" to="/routes/search" aria-label="CalmWay route search">
+        <Link className="brand" to={APP_CONFIG.homeRoute} aria-label="CalmWay home">
           <span className="brand__mark" aria-hidden="true">
             C
           </span>

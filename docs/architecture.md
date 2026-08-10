@@ -32,13 +32,13 @@ samples and calculates request-scoped route Crowd Exposure and CalmWay ranking.
 ## Current frontend flow
 
 ```text
-Future Home
+Home
   -> Route Search
   -> Route Options
   -> Active Navigation
        -> optional Crowd Alert state
-  -> Arrival
-  -> Future Home
+  -> Route summary
+  -> Home
 ```
 
 The frontend stores only small journey state in React Context. Redux is not

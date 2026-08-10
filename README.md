@@ -1,7 +1,8 @@
 # CalmWay
 
 CalmWay is a responsive walking-route web application for sensory-sensitive
-commuters in Melbourne CBD. The project has completed **Epic 1 Phase 6A**. The
+commuters in Melbourne CBD. The project has completed **Epic 1 Phase 6A** and
+integrated the teammate-owned Home experience. The
 frontend can use a one-shot browser geolocation or search for a real Mapbox
 starting point, request real walking candidates from the FastAPI backend,
 preview each returned LineString on Mapbox GL JS, and reuse the selected route
@@ -19,13 +20,13 @@ crowd-data and static-navigation limitations.
 ## Current Epic 1 flow
 
 ```text
-Future Home
+Home
   -> Route Search
   -> Route Options
   -> Active Navigation
   -> optional Crowd Alert state
-  -> Arrival
-  -> configurable Home route
+  -> Route summary
+  -> Home
 ```
 
 Frontend routes:
@@ -34,10 +35,12 @@ Frontend routes:
 - `/routes/options`
 - `/navigation`
 - `/arrival`
+- `/home` (or the internal path configured by `VITE_HOME_ROUTE`)
 
-The root route temporarily redirects to Route Search. The Home page belongs to
-another team member; `VITE_HOME_ROUTE` is the integration boundary and no Home
-page is implemented here.
+The root route redirects to the configured Home route. Home and the journey
+screens share the existing React Router tree, so the primary Home action opens
+Route Search without reloading the page. `VITE_HOME_ROUTE` remains the internal
+Home route integration boundary.
 
 ## Implemented through Phase 6A
 
@@ -63,8 +66,10 @@ page is implemented here.
   decision at exactly 0 m route progress;
 - route-specific in-memory alert acknowledgement and strict switching to the
   first eligible, real lower-P75 alternative in existing backend order;
-- final-product Search, Route Options, Navigation, Arrival, and Home-fallback
-  wording without user-visible phase badges or development diagnostics;
+- final-product Search, Route Options, Navigation, and Route summary wording
+  without user-visible phase badges or development diagnostics;
+- responsive Home integration with a router-native route-search action and
+  truthful summaries of the crowd features already implemented;
 - PostgreSQL/PostGIS ingestion, baselines, current activity, and point-level
   crowd evaluation from Phases 2A–2D.
 
@@ -154,6 +159,9 @@ The [Phase 6A final UI cleanup guide](docs/final-ui-cleanup-phase6a-cn.md)
 documents the removed development UI, final user wording, unavailable-data and
 static-navigation language, responsive checks, and intentionally unchanged
 technical behavior.
+The [Home integration guide](docs/home-integration-cn.md) documents the
+teammate-source boundary, router integration, truthful Home content, journey
+reset behavior, and responsive verification checklist.
 
 Use Node.js 20 or newer for the frontend and Python 3.12 (or another compatible
 modern Python 3 release) for the backend.
