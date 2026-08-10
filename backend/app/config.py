@@ -221,6 +221,9 @@ class Settings:
     database_url: str = field(
         default_factory=lambda: os.getenv("DATABASE_URL", "")
     )
+    refresh_secret: str = field(
+        default_factory=lambda: os.getenv("REFRESH_SECRET", "").strip()
+    )
     frontend_origins: tuple[str, ...] = field(default_factory=_read_origins)
     mapbox_directions: MapboxDirectionsSettings = field(
         default_factory=MapboxDirectionsSettings

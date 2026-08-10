@@ -31,6 +31,7 @@ Vercel Production 和需要联调的 Preview 环境必须分别配置：
 | `DATABASE_URL` | Neon 控制台提供的 **pooled** PostgreSQL 连接串；必须保密 |
 | `MAPBOX_ACCESS_TOKEN` | 后端 Mapbox token；必须保密，不能使用 `VITE_` 前缀 |
 | `FRONTEND_ORIGINS` | 已部署前端的完整 origin；多个 origin 用英文逗号分隔 |
+| `REFRESH_SECRET` | 内部 current-activity 刷新端点的 Bearer secret；必须保密 |
 
 其余配置已有项目默认值，不是当前生产启动的必填变量。仓库根目录
 `.env.example` 只包含本地示例或空占位符；真实值继续保存在未跟踪的
@@ -95,8 +96,8 @@ current-data refresh、scheduler 或后台线程，也不依赖 Docker 常驻进
 2. 将项目 Root Directory 设置为 `backend`，保留原生 FastAPI 检测和默认
    Build/Output 设置。
 3. 在目标 Preview/Production 环境分别添加敏感的 pooled
-   `DATABASE_URL`、敏感的 `MAPBOX_ACCESS_TOKEN`，以及准确的
-   `FRONTEND_ORIGINS`；不把值写入仓库。
+   `DATABASE_URL`、敏感的 `MAPBOX_ACCESS_TOKEN`、准确的
+   `FRONTEND_ORIGINS`，以及敏感的 `REFRESH_SECRET`；不把值写入仓库。
 4. 触发 Preview deployment，先检查 build/runtime 日志中没有 secret，
    再验证 `GET /health`、`GET /docs`、`GET /api/v1/crowd/point`、
    `POST /api/v1/routes/walking` 和生产 origin 的 OPTIONS 预检。

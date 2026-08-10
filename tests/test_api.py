@@ -19,6 +19,7 @@ def test_backend_api_contract_paths_remain_available() -> None:
     assert client.get("/docs").status_code == 200
     assert "get" in paths["/api/v1/crowd/point"]
     assert "post" in paths["/api/v1/routes/walking"]
+    assert "post" in paths["/api/v1/internal/refresh-current-activity"]
 
 
 def test_walking_route_cors_preflight_allows_local_frontend() -> None:
