@@ -45,6 +45,12 @@ an existing GeoJSON LineString, uses the configured route-sampling interval,
 and prints only route length, sample count, endpoints, and concise spacing
 information. It does not call Mapbox, the crowd point service, or the database.
 
+`evaluate_route_crowd.py` is the read-only Phase 3E route-sample evaluator. It
+loads an existing GeoJSON LineString, composes uniform route sampling directly
+with `SpatialCrowdService`, and prints support-state counts plus concise endpoint
+results. `--details` prints every ordered sample. It never refreshes City data,
+calls CalmWay over HTTP, calculates route-level crowd metrics, or writes data.
+
 All ingestion and baseline jobs must follow the complete rules in
 `handoff/epic1_backend_handoff_v3/`, including exact-payload deduplication,
 conflict preservation, complete 15-minute windows, relocation restrictions,

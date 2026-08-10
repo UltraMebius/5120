@@ -1,6 +1,11 @@
 """Walking route acquisition service boundary."""
 
 from .mapbox_directions_client import MapboxDirectionsClient
+from .route_crowd_evaluation_service import (
+    RouteCrowdEvaluation,
+    RouteCrowdEvaluationService,
+    RouteSampleCrowdResult,
+)
 from .route_sampling_service import (
     DegenerateRouteGeometryError,
     InvalidRouteGeometryError,
@@ -17,7 +22,10 @@ __all__ = [
     "DegenerateRouteGeometryError",
     "InvalidRouteGeometryError",
     "MapboxDirectionsClient",
+    "RouteCrowdEvaluation",
+    "RouteCrowdEvaluationService",
     "RouteSample",
+    "RouteSampleCrowdResult",
     "RouteSamplingConfigurationError",
     "RouteSamplingError",
     "RouteSamplingService",
