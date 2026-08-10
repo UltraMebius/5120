@@ -13,9 +13,18 @@ without database writes. A normal run transactionally upserts only `sensor` and
 `sensor_location_current`.
 
 `import_hourly_counts.py` is the Phase 2A-3 bounded historical-hour importer.
-Both dates are mandatory because the handoff evidence window is not declared as
-a production default. It streams a server-filtered official CSV, preserves zero
-counts, reports unknown historical IDs, and upserts known-sensor rows in batches.
+Both dates remain mandatory. Phase 2B freezes the production baseline training
+window at `2024-08-10` through `2026-02-07` inclusive. The importer streams a
+server-filtered official CSV, preserves zero counts, reports unknown historical
+IDs, and upserts known-sensor rows in batches. For the full window, use the
+resumable date chunks documented in `docs/hourly-count-ingestion-cn.md`.
+
+`build_historical_baselines.py` is the Phase 2B baseline job. Its dates are not
+configurable: it always uses the approved frozen training window. `--dry-run`
+performs source coverage and eligibility checks without writes. A normal run
+transactionally replaces only `sensor_hour_daytype_baseline` and
+`network_hour_daytype_baseline`, then verifies their keys, statistics, dates,
+relocation rules, zero participation, and logical checksums.
 
 Later ingestion and baseline jobs must follow the complete rules in
 `handoff/epic1_backend_handoff_v3/`, including exact-payload deduplication,

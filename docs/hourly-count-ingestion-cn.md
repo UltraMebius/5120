@@ -1,73 +1,74 @@
-# CalmWay 历史小时行人数据导入指南（Phase 2A-3）
+# CalmWay 历史小时数据导入指南
 
-本阶段导入 City of Melbourne 官方“Pedestrian Counting System (counts per hour)”数据，数据集 ID 为：
+本项目使用 City of Melbourne 官方数据集：
 
 ```text
 pedestrian-counting-system-monthly-counts-per-hour
 ```
 
-目标仅是权威表 `pedestrian_hourly_count`。本阶段不建立 Local/Network baseline，不计算 percentile、Crowd Level，也不导入分钟数据。
+导入目标是权威原始表 `pedestrian_hourly_count`。该表与 Local/Network baseline 分开，重复导入按 `(location_id, sensing_date, hour_day)` 更新，不会制造重复记录。
 
-## 1. 小时数据与分钟数据不同
+## 冻结训练窗口
 
-官方小时数据明确规定：某个小时没有行人经过时，会保存 `pedestriancount = 0`。因此 0 是真实观测值，不能当成缺失值。缺少或无法解析的 count 也不能擅自改成 0。分钟来源的“缺记录”规则属于后续阶段，不适用于这里。
+Phase 2B 已把生产训练窗口固定为：
 
-## 2. 日期范围必须显式提供
+```text
+2024-08-10 至 2026-02-07（含首尾两天）
+```
 
-交接证据审计了 `2024-08-08` 至 `2026-08-07`，V5/V5B 使用：
+`2024-08-10` 是后端直接可用的官方 live hourly source 起点。本项目不从另一份 archive 补 `2024-08-08` 或 `2024-08-09`。`2026-02-08` 之后属于 holdout，不能进入 baseline。
 
-- 训练：`2024-08-08` 至 `2026-02-07`；
-- holdout：`2026-02-08` 至 `2026-08-07`。
+## 数据语义
 
-但是交接配置没有把该范围声明为生产导入的固定默认值。程序不会猜测“最近一年/两年”，也不会自动导入 2009 年以来的全部 archive。每次 dry run 和真实导入都必须明确提供 `--start-date`、`--end-date`；完整生产范围需要团队/DS 确认。
+- `total_of_directions = 0` 是真实观察值，必须保留；
+- 缺失、负数或无法解析的 count 不会被改成 0；
+- `day_type` 按 Melbourne 日历日期生成：周一至周五为 `Weekday`，周六、周日为 `Weekend`；
+- `source_id` 只用于来源追踪，不是数据库主键；
+- 导入器使用服务端日期过滤、流式 CSV 和有限大小的数据库批次，不把完整数据集载入内存。
 
-## 3. 官方来源与字段映射
+历史 source ID 28、78 无法与当前权威 sensor master 对齐。完整窗口 dry-run 还发现 ID 65 同样不在当前 master。导入器会报告并跳过这些记录，不会伪造 sensor、位置或 geometry。
 
-程序使用带服务端日期过滤的官方 CSV export，并逐行读取，不把约 160 万条完整 archive 一次载入内存。数据库按最多 1000 行的 transaction batch upsert。
+## 导入命令
 
-| live 字段 | `pedestrian_hourly_count` |
-| --- | --- |
-| `location_id` | `location_id`，连接现有 `sensor.location_id` |
-| `sensing_date` | `sensing_date`，Melbourne 本地日历日期 |
-| `hourday` | `hour_day`，必须为 0–23 |
-| 日期的 weekday | `day_type = Weekday/Weekend` |
-| `id` | `source_id`，只用于来源追踪，不是数据库主键 |
-| `direction_1`, `direction_2` | 同名可空方向计数；不是必填字段 |
-| `pedestriancount` | `total_of_directions`，必须是非负整数，0 保留 |
-| `sensor_name` | `source_sensor_name` |
-| `location` | `source_location_text`，不声称它是历史几何模型 |
-
-权威主键是 `(location_id, sensing_date, hour_day)`。重复导入会更新同一个逻辑小时，不会产生重复行。
-
-## 4. Unknown 与迁移限制
-
-历史数据可能包含当前 134 个位置快照中不存在的退休/迁移 sensor ID。交接没有提供这些 ID 的完整权威主数据或历史位置表，所以本阶段不会伪造 `sensor` 或当前 geometry。此类小时记录会被明确跳过并汇总 ID/行数，等待团队/DS 决定如何补充历史 sensor master。
-
-ID 14、37、47、181 的有效原始小时观测不会因迁移备注而在本阶段删除。它们的 Local baseline 限制（37 从 2024-08-12 开始；47/181 暂停 Local Condition）应在下一阶段建立 baseline 时应用。`source_location_text` 只保留来源文本，不能证明旧记录发生在今天的 current geometry。
-
-## 5. Dry run 与真实导入
-
-先用一个很小的范围检查 live 字段和数据质量：
+先设置本地数据库连接：
 
 ```powershell
 $env:DATABASE_URL='postgresql+psycopg://epic1:epic1@localhost:5432/epic1'
-.\backend\.venv\Scripts\python.exe .\scripts\import_hourly_counts.py --dry-run --start-date 2025-01-04 --end-date 2025-01-04
 ```
 
-Dry run 会读取真实 CSV、保留 0、验证日期/小时/count，并只读检查 unknown IDs，不写数据库。
-
-真实导入与重复验证：
+完整窗口 dry-run（只读，不写数据库）：
 
 ```powershell
-.\backend\.venv\Scripts\python.exe .\scripts\import_hourly_counts.py --start-date 2025-01-04 --end-date 2025-01-04
-.\backend\.venv\Scripts\python.exe .\scripts\import_hourly_counts.py --start-date 2025-01-04 --end-date 2025-01-04
+.\.venv\Scripts\python.exe .\scripts\import_hourly_counts.py --start-date 2024-08-10 --end-date 2026-02-07 --dry-run
 ```
 
-## 6. 数据库只读验证
+官方服务器可能会关闭持续数分钟的单个 CSV 响应。真实导入建议使用可恢复的较短日期段；每一段仍调用同一个权威导入器：
 
 ```powershell
-docker exec epic1-postgis psql -U epic1 -d epic1 -c "SELECT COUNT(*), COUNT(*) FILTER (WHERE total_of_directions = 0), MIN(sensing_date), MAX(sensing_date) FROM pedestrian_hourly_count WHERE sensing_date BETWEEN DATE '2025-01-04' AND DATE '2025-01-04';"
-docker exec epic1-postgis psql -U epic1 -d epic1 -c "SELECT COUNT(*) - COUNT(DISTINCT (location_id, sensing_date, hour_day)) AS duplicate_keys FROM pedestrian_hourly_count;"
+$ranges = @(
+  @('2024-08-10','2024-10-31'),
+  @('2024-11-01','2024-12-31'),
+  @('2025-01-01','2025-02-28'),
+  @('2025-03-01','2025-04-30'),
+  @('2025-05-01','2025-06-30'),
+  @('2025-07-01','2025-08-31'),
+  @('2025-09-01','2025-10-31'),
+  @('2025-11-01','2025-12-31'),
+  @('2026-01-01','2026-02-07')
+)
+foreach ($range in $ranges) {
+  .\.venv\Scripts\python.exe .\scripts\import_hourly_counts.py `
+    --start-date $range[0] --end-date $range[1] --batch-size 5000
+  if ($LASTEXITCODE -ne 0) { throw "Import failed: $($range[0]) to $($range[1])" }
+}
 ```
 
-这是本地开发数据导入，不是云部署。不要提交 `.env`，也不要把 `DATABASE_URL` 输出到日志或前端。
+中断后可以重新运行同一段。已提交批次会安全更新，未完成部分会继续插入；不要 truncate `pedestrian_hourly_count`。
+
+## 只读验证
+
+```powershell
+docker exec epic1-postgis psql -U epic1 -d epic1 -c "SELECT COUNT(*) AS rows, COUNT(DISTINCT (location_id,sensing_date,hour_day)) AS distinct_keys, COUNT(*) FILTER (WHERE total_of_directions=0) AS zeros, MIN(sensing_date), MAX(sensing_date) FROM pedestrian_hourly_count WHERE sensing_date BETWEEN DATE '2024-08-10' AND DATE '2026-02-07';"
+```
+
+本地 `.env` 不应提交，也不要把数据库密码或 token 放入前端。

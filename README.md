@@ -1,11 +1,11 @@
 # CalmWay
 
 CalmWay is a responsive walking-route web application for sensory-sensitive
-commuters in Melbourne CBD. The project has completed **Epic 1 Phase 2A-3**:
+commuters in Melbourne CBD. The project has completed **Epic 1 Phase 2B**:
 the Phase 1 page flow and contracts remain in place, and the FastAPI backend can
-now verify PostgreSQL/PostGIS and import current sensor locations plus explicitly
-bounded historical hourly counts. Realtime ingestion and crowd features remain
-placeholders.
+verify PostgreSQL/PostGIS, import current sensor locations and the frozen hourly
+training window, and transactionally build Local and Network historical
+baselines. Realtime ingestion and current crowd features remain placeholders.
 
 ## Phase 1 flow
 
@@ -48,7 +48,7 @@ page is implemented here.
 
 Phase 1 does **not** perform:
 
-- City minute-count ingestion or historical baseline calculation;
+- City minute-count ingestion or current crowd calculation;
 - current 15-minute Network Crowd Exposure scoring;
 - City data writes, PostGIS spatial scoring, or business-data queries;
 - Mapbox geocoding, maps, or Directions requests;
@@ -96,7 +96,10 @@ for safe Docker lifecycle, configuration, and verification commands. The
 [sensor-location ingestion guide](docs/sensor-location-ingestion-cn.md) documents
 the live source mapping, dry run, transactional import, and spatial checks.
 The [hourly-count ingestion guide](docs/hourly-count-ingestion-cn.md) documents
-bounded CSV streaming, zero-count semantics, unknown IDs, and idempotency.
+the frozen training-window import, zero-count semantics, unknown IDs, and
+idempotency. The [historical baseline guide](docs/historical-baselines-cn.md)
+documents model eligibility, relocation rules, exact statistics, the baseline
+builder, and database verification.
 
 Use Node.js 20 or newer for the frontend and Python 3.12 (or another compatible
 modern Python 3 release) for the backend.
@@ -106,14 +109,13 @@ modern Python 3 release) for the backend.
 Create local environment files from `.env.example` as needed. Keep all actual
 `.env` files untracked and never place a server token in a `VITE_` variable.
 
-Backend:
+Backend, from the repository root:
 
 ```powershell
-cd backend
-py -m venv .venv
+python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
-python -m uvicorn app.main:app --reload
+python -m pip install -r backend\requirements.txt
+python -m uvicorn backend.app.main:app --reload
 ```
 
 Frontend, in another terminal:
@@ -136,14 +138,16 @@ Local URLs:
 From the repository root:
 
 ```powershell
-.\backend\.venv\Scripts\python.exe -m pytest
-.\backend\.venv\Scripts\python.exe .\scripts\check_database.py
-.\backend\.venv\Scripts\python.exe .\scripts\import_sensor_locations.py --dry-run
-.\backend\.venv\Scripts\python.exe .\scripts\import_hourly_counts.py --dry-run --start-date 2025-01-04 --end-date 2025-01-04
+.\.venv\Scripts\python.exe -m pytest
+.\.venv\Scripts\python.exe .\scripts\check_database.py
+.\.venv\Scripts\python.exe .\scripts\import_sensor_locations.py --dry-run
+.\.venv\Scripts\python.exe .\scripts\import_hourly_counts.py --dry-run --start-date 2024-08-10 --end-date 2026-02-07
+.\.venv\Scripts\python.exe .\scripts\build_historical_baselines.py --dry-run
+.\.venv\Scripts\python.exe .\scripts\build_historical_baselines.py
 cd frontend
 npm run build
 ```
 
-Later-phase tests for ingestion, percentiles, PostGIS boundaries, real route
-evaluation, GPS progress, and crowd-triggered rerouting are intentionally
-deferred until those features exist.
+Later-phase tests for minute ingestion, current crowd scoring, PostGIS route
+support, real route evaluation, GPS progress, and crowd-triggered rerouting are
+intentionally deferred until those features exist.
