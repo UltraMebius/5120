@@ -20,5 +20,5 @@ export function isMapboxConfigured(): boolean {
   return MAPBOX_PHASE_2_CONFIG.publicToken.length > 0;
 }
 
-// Phase 1 deliberately makes no Mapbox request. This module is the integration
-// boundary for Mapbox GL JS, Geocoding API v6 and Directions in later phases.
+// The smoke test uses only publicToken for Mapbox GL basemap resources. Search,
+// Geocoding API v6 and Directions remain later-phase integration boundaries.

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import AppHeader from "../components/layout/AppHeader";
+import MapboxMap from "../components/map/MapboxMap";
 import RouteSearchForm from "../components/route/RouteSearchForm";
 import { useJourney } from "../context/JourneyContext";
 import { findWalkingRoutes } from "../services/api";
@@ -50,6 +51,8 @@ function RouteSearchPage() {
             {error}
           </p>
         )}
+
+        <MapboxMap />
 
         <RouteSearchForm
           initialDestination={journey.destination}
