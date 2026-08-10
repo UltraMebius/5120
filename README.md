@@ -1,11 +1,13 @@
 # CalmWay
 
 CalmWay is a responsive walking-route web application for sensory-sensitive
-commuters in Melbourne CBD. The project has completed **Epic 1 Phase 3C**. The
+commuters in Melbourne CBD. The project has completed **Epic 1 Phase 3D**. The
 frontend can search for real Mapbox places, request real walking candidates from
 the FastAPI backend, preview each returned LineString on Mapbox GL JS, and reuse
-the selected route on the static Navigation screen. The Phase 2D crowd point
-engine remains available, but route-level crowd analysis is not connected yet.
+the selected route on the static Navigation screen. The backend now measures
+and uniformly samples those LineStrings at the configured interval. The Phase
+2D crowd point engine remains separate; route-level crowd analysis is not
+connected yet.
 
 ## Current Epic 1 flow
 
@@ -30,7 +32,7 @@ The root route temporarily redirects to Route Search. The Home page belongs to
 another team member; `VITE_HOME_ROUTE` is the integration boundary and no Home
 page is implemented here.
 
-## Implemented through Phase 3C
+## Implemented through Phase 3D
 
 - React Router page structure and a small Journey Context;
 - responsive desktop/mobile UI for the complete Epic 1 flow;
@@ -40,6 +42,8 @@ page is implemented here.
 - route cards supporting the actual returned candidate count;
 - real basemaps, full GeoJSON route lines, endpoint markers, and fitted bounds on
   Route Options and Navigation;
+- pure, deterministic cumulative-distance route sampling at the configured
+  interval, without Mapbox, crowd, database, or frontend coupling;
 - static Navigation maneuver, alert, alternative, and arrival preview states;
 - PostgreSQL/PostGIS ingestion, baselines, current activity, and point-level
   crowd evaluation from Phases 2A–2D.
@@ -105,7 +109,9 @@ inverse-distance weighting, point uncertainty, and manual verification.
 The [Mapbox place-search guide](docs/mapbox-search-phase3a-cn.md),
 [walking-directions guide](docs/mapbox-directions-phase3b-cn.md), and
 [route-visualisation guide](docs/mapbox-route-visualization-phase3c-cn.md)
-document the active Phase 3 frontend/backend route flow.
+document the active Phase 3 frontend/backend route flow. The [uniform route
+sampling guide](docs/route-sampling-phase3d-cn.md) documents Phase 3D geometry
+measurement, interpolation, endpoint rules, and offline verification.
 
 Use Node.js 20 or newer for the frontend and Python 3.12 (or another compatible
 modern Python 3 release) for the backend.

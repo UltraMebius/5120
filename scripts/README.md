@@ -40,6 +40,11 @@ prints the current window and uncertainty explicitly. `--debug` adds only the
 contributing sensor IDs, metre distances, scores, and normalised weights. It
 does not call the City API, Mapbox, or write `spatial_activity_cache`.
 
+`sample_route_geometry.py` is the offline Phase 3D geometry verifier. It reads
+an existing GeoJSON LineString, uses the configured route-sampling interval,
+and prints only route length, sample count, endpoints, and concise spacing
+information. It does not call Mapbox, the crowd point service, or the database.
+
 All ingestion and baseline jobs must follow the complete rules in
 `handoff/epic1_backend_handoff_v3/`, including exact-payload deduplication,
 conflict preservation, complete 15-minute windows, relocation restrictions,

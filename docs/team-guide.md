@@ -15,8 +15,8 @@
 - `schemas/` owns validated API shapes;
 - `models/` owns domain enums;
 - `services/crowd/` will own the frozen crowd algorithm;
-- `services/routing/` owns Mapbox walking candidates; CalmWay route sampling
-  and ranking remain later integration work;
+- `services/routing/` owns Mapbox walking candidates and pure uniform route
+  sampling; crowd evaluation and ranking remain later integration work;
 - `services/navigation/` will own remaining-route checks and rerouting;
 - `repositories/` and `db/` will own PostgreSQL/PostGIS access.
 

@@ -1,6 +1,6 @@
 # CalmWay Epic 1 Architecture
 
-## Current Phase 3C structure
+## Current Phase 3D structure
 
 ```text
 React Route Search + Mapbox Search Box
@@ -10,11 +10,17 @@ React Route Search + Mapbox Search Box
   -> Mapbox Directions (walking, full GeoJSON)
   -> Journey Context route candidates
   -> shared RouteMap on Route Options and Navigation
+
+Existing full GeoJSON LineString
+  -> pure RouteSamplingService
+  -> Haversine cumulative distance
+  -> ordered configured-interval sample points
+  -> future Phase 3E crowd evaluation boundary
 ```
 
 The legacy `GET /api/routes` endpoint remains compatibility preview data, but it
-is not used by the active Route Search flow. Phase 3C renders real Mapbox route
-geometry without route-level Crowd Exposure or CalmWay ranking.
+is not used by the active Route Search flow. Phase 3D samples real route
+geometry but does not yet call route-level Crowd Exposure or CalmWay ranking.
 
 ## Current frontend flow
 

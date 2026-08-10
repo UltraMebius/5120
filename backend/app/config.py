@@ -103,7 +103,7 @@ class SpatialSettings:
 
 @dataclass(frozen=True)
 class RouteSettings:
-    """Route scoring/ranking configuration to be implemented after Phase 1."""
+    """Route sampling plus future scoring/ranking configuration."""
 
     sample_interval_m: int = field(
         default_factory=lambda: _read_int("ROUTE_SAMPLE_INTERVAL_M", 50)
