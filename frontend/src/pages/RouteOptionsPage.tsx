@@ -12,25 +12,24 @@ function RouteOptionsPage() {
   const navigate = useNavigate();
   const journey = useJourney();
   const preference = getPreferenceOption(journey.preference);
-  const [previewRouteId, setPreviewRouteId] = useState<string | null>(
+  const [shownRouteId, setShownRouteId] = useState<string | null>(
     journey.routes[0]?.id ?? null,
   );
-  const previewRoute =
-    journey.routes.find((route) => route.id === previewRouteId) ??
+  const shownRoute =
+    journey.routes.find((route) => route.id === shownRouteId) ??
     journey.routes[0];
   const mapOrigin = journey.origin;
   const mapDestination =
     journey.destination?.source === "MAPBOX" ? journey.destination : null;
-  const hasRecommendation = journey.recommendedRouteId !== null;
 
   useEffect(() => {
     if (
       journey.routes.length > 0 &&
-      !journey.routes.some((route) => route.id === previewRouteId)
+      !journey.routes.some((route) => route.id === shownRouteId)
     ) {
-      setPreviewRouteId(journey.routes[0].id);
+      setShownRouteId(journey.routes[0].id);
     }
-  }, [journey.routes, previewRouteId]);
+  }, [journey.routes, shownRouteId]);
 
   function handleDepart(route: WalkingRoute) {
     journey.selectRoute(route);
@@ -59,24 +58,23 @@ function RouteOptionsPage() {
           </div>
         </section>
 
-        <div className="preview-notice">
+        <div className="route-notice">
           <span aria-hidden="true">i</span>
           {journey.rankingStatus === "INSUFFICIENT_DATA" ? (
             <p>
-              <strong>Current crowd ranking is unavailable.</strong> These real
-              Mapbox walking routes remain available, but none has enough
-              current crowd coverage for a CalmWay recommendation.
+              <strong>Crowd information is currently unavailable.</strong> You
+              can still view and use these walking routes.
             </p>
           ) : (
             <p>
-              <strong>Current crowd-aware comparison.</strong> CalmWay has
-              ordered these routes using the backend&apos;s provisional MVP
-              crowd-ranking policy and your selected tolerance.
+              <strong>Routes matched to your preference.</strong> Options are
+              ordered using current pedestrian activity and your selected
+              crowd tolerance.
             </p>
           )}
         </div>
 
-        {previewRoute ? (
+        {shownRoute ? (
           <div className="route-options-layout">
             <section
               aria-label="Walking route options"
@@ -86,12 +84,12 @@ function RouteOptionsPage() {
             >
               {journey.routes.map((route) => (
                 <RouteCard
-                  isPreviewed={route.id === previewRoute.id}
+                  isShownOnMap={route.id === shownRoute.id}
                   isRecommended={journey.recommendedRouteId === route.id}
                   key={route.id}
                   onDepart={handleDepart}
-                  onPreview={(selectedRoute) =>
-                    setPreviewRouteId(selectedRoute.id)
+                  onShowOnMap={(selectedRoute) =>
+                    setShownRouteId(selectedRoute.id)
                   }
                   route={route}
                   toleranceLevel={preference.uiLevel}
@@ -101,7 +99,7 @@ function RouteOptionsPage() {
             <RouteMap
               destination={mapDestination}
               origin={mapOrigin}
-              route={previewRoute}
+              route={shownRoute}
               variant="options"
             />
           </div>
@@ -118,25 +116,11 @@ function RouteOptionsPage() {
           </section>
         )}
 
-        {import.meta.env.DEV && previewRoute && (
-          <aside className="route-development-check">
-            <strong>Development check — previewed route</strong>
-            <span>
-              source={previewRoute.source} · geometry=
-              {previewRoute.geometry.type} · coordinates=
-              {previewRoute.geometry.coordinates.length} · distance=
-              {previewRoute.distanceMeters.toFixed(1)} m · duration=
-              {previewRoute.durationSeconds.toFixed(1)} s · steps=
-              {previewRoute.steps.length}
-            </span>
-          </aside>
-        )}
-
         {journey.routes.length > 0 && (
           <p className="crowd-disclaimer crowd-disclaimer--footer">
-            {hasRecommendation
-              ? "The CalmWay recommendation uses current relative pedestrian activity. The MVP ranking policy is provisional, not a medical or sensory-safety assessment."
-              : "No CalmWay recommendation is shown when current crowd coverage is insufficient. Route distance, duration and geometry remain available."}
+            Crowd levels are relative estimates based on pedestrian activity
+            data and should not be treated as medical advice or safety
+            guarantees.
           </p>
         )}
       </main>

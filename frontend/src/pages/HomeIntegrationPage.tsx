@@ -1,9 +1,14 @@
+import { Link } from "react-router-dom";
+
 function HomeIntegrationPage() {
   return (
     <main className="standalone-state">
-      <section aria-labelledby="home-integration-title">
-        <h1 id="home-integration-title">Home integration placeholder</h1>
-        <p>The final Home page will be provided by the Home feature owner.</p>
+      <section className="empty-state" aria-labelledby="navigation-ended-title">
+        <h1 id="navigation-ended-title">Navigation ended</h1>
+        <p>Your CalmWay route has been cleared.</p>
+        <Link className="button button--primary" to="/routes/search">
+          Plan another walk
+        </Link>
       </section>
     </main>
   );

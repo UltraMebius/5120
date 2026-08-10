@@ -55,7 +55,7 @@ function NavigationPage() {
       ? "Crowd alert ahead"
       : alert.decision === "CLEAR"
         ? "No alert triggered"
-        : "Monitoring unavailable";
+        : null;
 
   return (
     <div className="navigation-page">
@@ -105,16 +105,17 @@ function NavigationPage() {
               <strong>{formatWalkingDistance(route.distanceMeters)}</strong>
               <span>route distance</span>
             </div>
-            <span
-              className={`navigation-crowd-label navigation-crowd-label--${alert.decision.toLowerCase()}`}
-            >
-              {alertLabel}
-            </span>
+            {alertLabel && (
+              <span
+                className={`navigation-crowd-label navigation-crowd-label--${alert.decision.toLowerCase()}`}
+              >
+                {alertLabel}
+              </span>
+            )}
           </div>
 
-          <p className="navigation-preview-note">
-            Initial route-ahead check at 0 m. This overview does not track live
-            location or route progress.
+          <p className="navigation-limit-note">
+            Route overview. Live location and progress tracking are not enabled.
           </p>
 
           {journey.statusMessage && (
@@ -139,13 +140,12 @@ function NavigationPage() {
 
           {alert.decision === "CLEAR" && (
             <section
-              aria-labelledby="crowd-clear-title"
+              aria-label="Crowd status"
               className="navigation-crowd-state navigation-crowd-state--clear"
             >
-              <strong id="crowd-clear-title">No crowd alert detected ahead</strong>
               <p>
-                No crowd alert is currently triggered from the available
-                route-ahead data.
+                No crowd alert is currently triggered from the available data
+                ahead.
               </p>
             </section>
           )}
@@ -157,14 +157,24 @@ function NavigationPage() {
               role="status"
             >
               <strong id="crowd-unavailable-title">
-                Crowd monitoring unavailable
+                Crowd information unavailable
               </strong>
               <p>
                 There is not enough current pedestrian data ahead to assess
-                your crowd preference.
+                your selected crowd preference.
               </p>
             </section>
           )}
+
+          <div className="navigation-overview-actions">
+            <button
+              className="button button--secondary"
+              onClick={() => navigate("/arrival")}
+              type="button"
+            >
+              End route overview
+            </button>
+          </div>
         </section>
       </main>
     </div>

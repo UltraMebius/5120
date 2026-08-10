@@ -2,6 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 
 import { APP_CONFIG } from "../config";
 import { useJourney } from "../context/JourneyContext";
+import { getPreferenceOption } from "../types/crowd";
 import {
   formatWalkingDistance,
   formatWalkingDuration,
@@ -11,6 +12,7 @@ function ArrivalPage() {
   const navigate = useNavigate();
   const journey = useJourney();
   const route = journey.selectedRoute;
+  const preference = getPreferenceOption(journey.preference);
 
   if (!route || !journey.destination) {
     return (
@@ -19,8 +21,8 @@ function ArrivalPage() {
           <span className="empty-state__icon" aria-hidden="true">
             ✓
           </span>
-          <h1>No completed journey</h1>
-          <p>Start a route to preview the arrival summary.</p>
+          <h1>No route selected</h1>
+          <p>Choose a walking route to view its summary.</p>
           <Link className="button button--primary" to="/routes/search">
             Find a route
           </Link>
@@ -38,32 +40,32 @@ function ArrivalPage() {
     <main className="arrival-page">
       <section className="arrival-card">
         <div className="arrival-card__mark" aria-hidden="true">
-          ✓
+          →
         </div>
-        <p className="eyebrow">Journey complete</p>
-        <h1>You&apos;ve arrived</h1>
+        <p className="eyebrow">Planned journey</p>
+        <h1>Route summary</h1>
         <p className="arrival-card__destination">
           {journey.destination.label}
         </p>
 
         <div className="arrival-stats">
           <div>
+            <span>Planned distance</span>
+            <strong>{formatWalkingDistance(route.distanceMeters)}</strong>
+          </div>
+          <div>
             <span>Estimated time</span>
             <strong>{formatWalkingDuration(route.durationSeconds)}</strong>
           </div>
           <div>
-            <span>Route distance</span>
-            <strong>{formatWalkingDistance(route.distanceMeters)}</strong>
-          </div>
-          <div>
-            <span>Journey crowd load</span>
-            <strong>Not evaluated</strong>
+            <span>Selected tolerance</span>
+            <strong>{preference.uiLevel}</strong>
           </div>
         </div>
 
-        <p className="preview-caption">
-          Navigation remains a preview; the route summary uses real Mapbox
-          distance and duration.
+        <p className="arrival-note">
+          This summary reflects the planned route. Live route progress and
+          actual journey time were not tracked.
         </p>
 
         <button

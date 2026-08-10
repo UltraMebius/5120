@@ -129,8 +129,7 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
           return {
             ...current,
             selectedRoute: existingRoute,
-            statusMessage:
-              "Switched to an existing alternative from this route search.",
+            statusMessage: "Route changed to a lower-stimulation alternative.",
           };
         });
       },

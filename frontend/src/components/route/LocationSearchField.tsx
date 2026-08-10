@@ -103,7 +103,7 @@ function LocationSearchField({
       setHasCompletedSuggest(false);
       setIsSuggesting(false);
       setSearchError(
-        "Place search is unavailable because the Mapbox public token is not configured.",
+        "Place search is currently unavailable. Please try again later.",
       );
       setSuggestions([]);
       return;
@@ -365,13 +365,6 @@ function LocationSearchField({
       {selectedLocation && (
         <p className="field-status field-status--selected" id={selectionId}>
           Selected: {selectedLocationDescription(selectedLocation)}
-        </p>
-      )}
-
-      {import.meta.env.DEV && selectedLocation && (
-        <p className="field-hint location-search__development-check">
-          Development check: longitude {selectedLocation.longitude.toFixed(6)},
-          latitude {selectedLocation.latitude.toFixed(6)}
         </p>
       )}
 

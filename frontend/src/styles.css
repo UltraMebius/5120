@@ -180,19 +180,6 @@ p {
   line-height: 1.7;
 }
 
-.phase-pill {
-  display: inline-flex;
-  padding: 6px 10px;
-  border: 1px solid #c9ded5;
-  border-radius: 999px;
-  color: #41685d;
-  background: #f0f8f4;
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
 .search-form {
   padding: clamp(22px, 4vw, 38px);
   border: 1px solid var(--line);
@@ -384,12 +371,6 @@ input[aria-invalid="true"] {
 .field-status--selected {
   color: #2c6a59;
   font-weight: 700;
-}
-
-.location-search__development-check {
-  color: #65736f;
-  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono",
-    monospace;
 }
 
 .text-button {
@@ -709,20 +690,6 @@ input[aria-invalid="true"] {
   line-height: 1.5;
 }
 
-.search-map__label {
-  position: absolute;
-  z-index: 1;
-  bottom: 24px;
-  left: 12px;
-  padding: 5px 8px;
-  border-radius: 6px;
-  color: #4a5d57;
-  background: rgb(255 255 255 / 88%);
-  box-shadow: 0 2px 8px rgb(34 57 50 / 12%);
-  font-size: 0.67rem;
-  font-weight: 800;
-}
-
 .page-title-row {
   display: flex;
   align-items: end;
@@ -774,7 +741,7 @@ input[aria-invalid="true"] {
   font-size: 0.95rem;
 }
 
-.preview-notice {
+.route-notice {
   display: flex;
   align-items: flex-start;
   gap: 12px;
@@ -786,7 +753,7 @@ input[aria-invalid="true"] {
   background: #edf5f1;
 }
 
-.preview-notice > span {
+.route-notice > span {
   display: grid;
   width: 20px;
   height: 20px;
@@ -799,7 +766,7 @@ input[aria-invalid="true"] {
   font-weight: 800;
 }
 
-.preview-notice p {
+.route-notice p {
   margin: 0;
   font-size: 0.82rem;
   line-height: 1.55;
@@ -842,7 +809,7 @@ input[aria-invalid="true"] {
     box-shadow 150ms ease;
 }
 
-.route-card--previewed {
+.route-card--selected {
   border-color: var(--brand);
   box-shadow:
     0 0 0 2px rgb(40 108 91 / 10%),
@@ -1056,24 +1023,6 @@ input[aria-invalid="true"] {
   line-height: 1.5;
 }
 
-.route-map__label {
-  position: absolute;
-  z-index: 2;
-  bottom: 26px;
-  left: 12px;
-  max-width: calc(100% - 160px);
-  overflow: hidden;
-  padding: 6px 9px;
-  border-radius: 6px;
-  color: #4a5d57;
-  background: rgb(255 255 255 / 90%);
-  box-shadow: 0 2px 8px rgb(34 57 50 / 12%);
-  font-size: 0.69rem;
-  font-weight: 800;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .route-map__marker {
   display: grid;
   width: 30px;
@@ -1096,25 +1045,6 @@ input[aria-invalid="true"] {
   height: 38px;
   border-radius: 18px 18px 18px 4px;
   background: #c95f51;
-}
-
-.route-development-check {
-  display: grid;
-  gap: 5px;
-  margin-top: 20px;
-  padding: 12px 14px;
-  border: 1px dashed #b8c9c3;
-  border-radius: 10px;
-  color: #586964;
-  background: #f8faf9;
-  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono",
-    monospace;
-  font-size: 0.72rem;
-  line-height: 1.55;
-}
-
-.route-development-check strong {
-  color: #365349;
 }
 
 .empty-state {
@@ -1316,7 +1246,7 @@ input[aria-invalid="true"] {
   text-transform: uppercase;
 }
 
-.navigation-preview-note {
+.navigation-limit-note {
   margin-top: 17px;
   margin-bottom: 0;
   padding: 9px 11px;
@@ -1399,6 +1329,20 @@ input[aria-invalid="true"] {
   background: #faf8f2;
 }
 
+.navigation-overview-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #e2e9e5;
+}
+
+.navigation-overview-actions .button {
+  min-height: 36px;
+  padding: 7px 12px;
+  font-size: 0.76rem;
+}
+
 .crowd-alert {
   width: 100%;
   margin-top: 14px;
@@ -1441,7 +1385,7 @@ input[aria-invalid="true"] {
   letter-spacing: -0.025em;
 }
 
-.crowd-alert > p:not(.preview-caption, .crowd-alert__note) {
+.crowd-alert > p:not(.supporting-note, .crowd-alert__note) {
   margin: 13px 0;
   color: var(--muted);
   font-size: 0.82rem;
@@ -1472,7 +1416,8 @@ input[aria-invalid="true"] {
   flex: 1 1 220px;
 }
 
-.preview-caption {
+.supporting-note,
+.arrival-note {
   margin: 15px 0 0;
   color: #7d8985;
   font-size: 0.68rem;
@@ -1556,7 +1501,7 @@ input[aria-invalid="true"] {
   font-size: 1rem;
 }
 
-.arrival-card > .preview-caption {
+.arrival-card > .arrival-note {
   margin-bottom: 18px;
 }
 
@@ -1737,6 +1682,10 @@ input[aria-invalid="true"] {
 
   .navigation-status__summary .navigation-crowd-label {
     grid-column: 1 / -1;
+  }
+
+  .navigation-overview-actions .button {
+    width: 100%;
   }
 
   .crowd-alert {

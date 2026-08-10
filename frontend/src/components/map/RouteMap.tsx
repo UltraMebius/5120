@@ -139,7 +139,7 @@ function RouteMap({ destination, origin, route, variant }: RouteMapProps) {
     let map: mapboxgl.Map | null = null;
     const handleMapError = () => {
       setMapError(
-        "The route map could not be loaded. Check the Mapbox token and network connection.",
+        "The route map could not be loaded. Check your connection and try again.",
       );
     };
     const handleStyleLoad = () => {
@@ -300,9 +300,9 @@ function RouteMap({ destination, origin, route, variant }: RouteMapProps) {
   }, [destination, origin, styleRevision, variant, visualisation]);
 
   const fallbackMessage = !configured
-    ? "Mapbox is not configured. Add the public token to view this route."
+    ? "The route map is currently unavailable."
     : !visualisation
-      ? "This route does not contain valid LineString geometry. The route details are still available."
+      ? "This route cannot currently be displayed on the map. Route details remain available."
       : mapError;
 
   return (
@@ -310,7 +310,7 @@ function RouteMap({ destination, origin, route, variant }: RouteMapProps) {
       aria-label={
         variant === "navigation"
           ? `Selected walking route map: ${route.name}`
-          : `Route preview for ${route.name}`
+          : `Map showing ${route.name}`
       }
       className={`route-map route-map--${variant}`}
     >
@@ -321,10 +321,6 @@ function RouteMap({ destination, origin, route, variant }: RouteMapProps) {
           <strong>Route map unavailable</strong>
           <span>{fallbackMessage}</span>
         </div>
-      )}
-
-      {variant === "options" && (
-        <span className="route-map__label">Previewing: {route.name}</span>
       )}
     </section>
   );

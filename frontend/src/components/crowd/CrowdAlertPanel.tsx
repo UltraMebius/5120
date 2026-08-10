@@ -35,7 +35,7 @@ function CrowdAlertPanel({
           !
         </div>
         <div>
-          <p className="eyebrow">Initial route-ahead crowd check</p>
+          <p className="eyebrow">Crowd alert</p>
           <h2 id="crowd-alert-title">Busier pedestrian activity ahead</h2>
         </div>
       </div>
@@ -72,9 +72,9 @@ function CrowdAlertPanel({
           Continue current route
         </button>
       </div>
-      <p className="preview-caption">
-        This is an initial check at 0 m route progress. It does not track live
-        location or update while you walk.
+      <p className="supporting-note">
+        This alert uses the route-ahead data available when you searched. Live
+        updates are not enabled.
       </p>
     </section>
   );

@@ -146,15 +146,13 @@ function RouteSearchForm({
     if (!trimmedOrigin) {
       nextErrors.origin = "Origin is required.";
     } else if (!origin.selectedLocation) {
-      nextErrors.origin =
-        "Select a starting point from the Mapbox suggestions.";
+      nextErrors.origin = "Choose a starting point from the suggestions.";
     }
 
     if (!trimmedDestination) {
       nextErrors.destination = "Destination is required.";
     } else if (destination.selectedLocation?.source !== "MAPBOX") {
-      nextErrors.destination =
-        "Select a destination from the Mapbox suggestions.";
+      nextErrors.destination = "Choose a destination from the suggestions.";
     }
 
     setErrors(nextErrors);
@@ -221,16 +219,14 @@ function RouteSearchForm({
       </div>
 
       <p className="integration-note">
-        Use your current location or select a Mapbox starting point. Destination
-        must be selected from Mapbox suggestions before CalmWay requests and
-        evaluates real walking routes.
+        Use your current location or choose a starting point and destination.
       </p>
 
       <CrowdPreferenceSelector onChange={setPreference} value={preference} />
 
       <p className="crowd-disclaimer">
-        Crowd levels are relative estimates based on City of Melbourne
-        pedestrian activity data. They are not medical or safety thresholds.
+        Crowd levels are relative estimates based on pedestrian activity data
+        and should not be treated as medical advice or safety guarantees.
       </p>
 
       <button
@@ -238,7 +234,7 @@ function RouteSearchForm({
         disabled={isLoading || isLocating}
         type="submit"
       >
-        {isLoading ? "Loading walking routes..." : "Find walking routes"}
+        {isLoading ? "Finding walking routes..." : "Find walking routes"}
         <span aria-hidden="true">→</span>
       </button>
     </form>

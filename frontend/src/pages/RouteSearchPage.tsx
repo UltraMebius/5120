@@ -38,10 +38,9 @@ function RouteSearchPage() {
           <p className="eyebrow">Melbourne CBD · Walking</p>
           <h1>Find a calmer way there</h1>
           <p>
-            Compare real walking routes using current crowd coverage and your
-            selected tolerance.
+            Choose where you&apos;re going and compare walking routes using your
+            preferred crowd tolerance.
           </p>
-          <span className="phase-pill">Epic 1 · Phase 5A current origin</span>
         </section>
 
         {error && (

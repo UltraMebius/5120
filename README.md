@@ -1,7 +1,7 @@
 # CalmWay
 
 CalmWay is a responsive walking-route web application for sensory-sensitive
-commuters in Melbourne CBD. The project has completed **Epic 1 Phase 5B-2**. The
+commuters in Melbourne CBD. The project has completed **Epic 1 Phase 6A**. The
 frontend can use a one-shot browser geolocation or search for a real Mapbox
 starting point, request real walking candidates from the FastAPI backend,
 preview each returned LineString on Mapbox GL JS, and reuse the selected route
@@ -12,6 +12,9 @@ approved coverage, P75, preference, and deterministic ranking policy.
 The same per-route evaluation now also produces an initial route-ahead decision
 at 0 m, which Navigation presents without claiming live GPS progress. An alert
 may offer a strictly eligible route already present in the original response.
+The user-facing flow has also been cleaned of development badges, diagnostics,
+provider-specific helper text, and preview terminology while retaining honest
+crowd-data and static-navigation limitations.
 
 ## Current Epic 1 flow
 
@@ -36,7 +39,7 @@ The root route temporarily redirects to Route Search. The Home page belongs to
 another team member; `VITE_HOME_ROUTE` is the integration boundary and no Home
 page is implemented here.
 
-## Implemented through Phase 5B-2
+## Implemented through Phase 6A
 
 - React Router page structure and a small Journey Context;
 - responsive desktop/mobile UI for the complete Epic 1 flow;
@@ -60,6 +63,8 @@ page is implemented here.
   decision at exactly 0 m route progress;
 - route-specific in-memory alert acknowledgement and strict switching to the
   first eligible, real lower-P75 alternative in existing backend order;
+- final-product Search, Route Options, Navigation, Arrival, and Home-fallback
+  wording without user-visible phase badges or development diagnostics;
 - PostgreSQL/PostGIS ingestion, baselines, current activity, and point-level
   crowd evaluation from Phases 2A–2D.
 
@@ -145,6 +150,10 @@ The [Phase 5B-2 Navigation decision record](docs/phase5b2-navigation-alert-decis
 and [Simplified Chinese Navigation guide](docs/navigation-crowd-alert-phase5b2-cn.md)
 document initial progress, the three UI states, acknowledgement, and the strict
 existing-alternative switch rule.
+The [Phase 6A final UI cleanup guide](docs/final-ui-cleanup-phase6a-cn.md)
+documents the removed development UI, final user wording, unavailable-data and
+static-navigation language, responsive checks, and intentionally unchanged
+technical behavior.
 
 Use Node.js 20 or newer for the frontend and Python 3.12 (or another compatible
 modern Python 3 release) for the backend.

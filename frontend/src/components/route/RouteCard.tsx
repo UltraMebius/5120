@@ -7,19 +7,19 @@ import {
 } from "../../utils/formatRoute";
 
 interface RouteCardProps {
-  isPreviewed: boolean;
+  isShownOnMap: boolean;
   isRecommended: boolean;
   onDepart: (route: WalkingRoute) => void;
-  onPreview: (route: WalkingRoute) => void;
+  onShowOnMap: (route: WalkingRoute) => void;
   route: WalkingRoute;
   toleranceLevel: FrontendCrowdLevel;
 }
 
 function RouteCard({
-  isPreviewed,
+  isShownOnMap,
   isRecommended,
   onDepart,
-  onPreview,
+  onShowOnMap,
   route,
   toleranceLevel,
 }: RouteCardProps) {
@@ -29,7 +29,6 @@ function RouteCard({
     route.p75CrowdExposureScore !== null
       ? {
           level: route.routeCrowdPresentationLevel,
-          score: route.p75CrowdExposureScore,
         }
       : null;
   const preferenceMessage =
@@ -39,13 +38,13 @@ function RouteCard({
 
   return (
     <article
-      className={`route-card${isPreviewed ? " route-card--previewed" : ""}${
+      className={`route-card${isShownOnMap ? " route-card--selected" : ""}${
         isRecommended ? " route-card--recommended" : ""
       }`}
     >
       <div className="route-card__topline">
         <div>
-          <span className="route-source-label">Mapbox walking</span>
+          <span className="route-source-label">Walking route</span>
           <h2>{route.name}</h2>
         </div>
         {isRecommended ? (
@@ -53,9 +52,11 @@ function RouteCard({
             CalmWay recommendation
           </span>
         ) : route.rank !== null ? (
-          <span className="route-rank-label">CalmWay rank #{route.rank}</span>
+          <span className="route-rank-label">Option #{route.rank}</span>
         ) : (
-          <span className="crowd-unavailable-label">Crowd unavailable</span>
+          <span className="crowd-unavailable-label">
+            Crowd information unavailable
+          </span>
         )}
       </div>
 
@@ -64,9 +65,7 @@ function RouteCard({
           <>
             <CrowdBadge level={crowdResult.level} />
             <span>
-              <strong>
-                {crowdResult.score.toFixed(1)} / 100 exposure
-              </strong>
+              <strong>Current crowd estimate</strong>
               <small
                 className={
                   route.preferenceStatus === "ABOVE_PREFERENCE"
@@ -80,10 +79,9 @@ function RouteCard({
           </>
         ) : (
           <span>
-            <strong>Current crowd analysis unavailable</strong>
+            <strong>Crowd information unavailable</strong>
             <small>
-              {route.dataCoveragePct.toFixed(1)}% of this route currently has
-              usable crowd data.
+              You can still view and use this walking route.
             </small>
           </span>
         )}
@@ -112,12 +110,12 @@ function RouteCard({
 
       <div className="route-card__actions">
         <button
-          aria-pressed={isPreviewed}
+          aria-pressed={isShownOnMap}
           className="button button--secondary"
-          onClick={() => onPreview(route)}
+          onClick={() => onShowOnMap(route)}
           type="button"
         >
-          {isPreviewed ? "Shown on map" : "Preview on map"}
+          {isShownOnMap ? "Shown on map" : "View on map"}
         </button>
         <button
           className="button button--primary"

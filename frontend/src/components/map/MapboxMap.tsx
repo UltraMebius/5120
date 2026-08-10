@@ -27,7 +27,7 @@ function MapboxMap() {
     let map: mapboxgl.Map | null = null;
     const handleMapError = () => {
       setInitialisationError(
-        "The Mapbox basemap could not be loaded. Check the token and network connection.",
+        "The map could not be loaded. Check your connection and try again.",
       );
     };
 
@@ -48,7 +48,7 @@ function MapboxMap() {
       map.on("error", handleMapError);
     } catch {
       setInitialisationError(
-        "The Mapbox basemap could not be initialised in this browser.",
+        "The map could not be opened in this browser.",
       );
     }
 
@@ -65,15 +65,15 @@ function MapboxMap() {
 
   return (
     <section
-      aria-label="Interactive Melbourne CBD basemap smoke test"
+      aria-label="Interactive map of Melbourne CBD"
       className="search-map"
     >
       <div className="search-map__canvas" ref={containerRef} />
 
       {!configured && (
         <div className="search-map__message" role="status">
-          <strong>Mapbox token is not configured.</strong>
-          <span>Add VITE_MAPBOX_PUBLIC_TOKEN to frontend/.env.</span>
+          <strong>Map unavailable</strong>
+          <span>The map is currently unavailable. You can still plan a route.</span>
         </div>
       )}
 
@@ -83,8 +83,6 @@ function MapboxMap() {
           <span>{initialisationError}</span>
         </div>
       )}
-
-      <span className="search-map__label">Interactive Melbourne basemap</span>
     </section>
   );
 }
