@@ -1,0 +1,3 @@
+id,location_id,sensing_date,hourday,direction_1,direction_2,pedestriancount,sensor_name,location
+251520250104,25,2025-01-04,15,0,0,0,MCEC_T,"-37.82401896, 144.95604426"
+30020250104,3,2025-01-04,0,10,12,22,Swa295_T,"-37.81101524, 144.96429485"

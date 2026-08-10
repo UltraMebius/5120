@@ -12,6 +12,11 @@ Use `--dry-run` to inspect the live City JSON fields and validation result
 without database writes. A normal run transactionally upserts only `sensor` and
 `sensor_location_current`.
 
+`import_hourly_counts.py` is the Phase 2A-3 bounded historical-hour importer.
+Both dates are mandatory because the handoff evidence window is not declared as
+a production default. It streams a server-filtered official CSV, preserves zero
+counts, reports unknown historical IDs, and upserts known-sensor rows in batches.
+
 Later ingestion and baseline jobs must follow the complete rules in
 `handoff/epic1_backend_handoff_v3/`, including exact-payload deduplication,
 conflict preservation, complete 15-minute windows, relocation restrictions,

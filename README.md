@@ -1,10 +1,11 @@
 # CalmWay
 
 CalmWay is a responsive walking-route web application for sensory-sensitive
-commuters in Melbourne CBD. The project has completed **Epic 1 Phase 2A-2**:
+commuters in Melbourne CBD. The project has completed **Epic 1 Phase 2A-3**:
 the Phase 1 page flow and contracts remain in place, and the FastAPI backend can
-now verify PostgreSQL/PostGIS and import current official City pedestrian sensor
-locations. Routing, count ingestion, and crowd-data features remain placeholders.
+now verify PostgreSQL/PostGIS and import current sensor locations plus explicitly
+bounded historical hourly counts. Realtime ingestion and crowd features remain
+placeholders.
 
 ## Phase 1 flow
 
@@ -47,7 +48,7 @@ page is implemented here.
 
 Phase 1 does **not** perform:
 
-- City hourly/minute count ingestion or baseline calculation;
+- City minute-count ingestion or historical baseline calculation;
 - current 15-minute Network Crowd Exposure scoring;
 - City data writes, PostGIS spatial scoring, or business-data queries;
 - Mapbox geocoding, maps, or Directions requests;
@@ -94,6 +95,8 @@ Database access uses SQLAlchemy 2.x with psycopg 3. See the
 for safe Docker lifecycle, configuration, and verification commands. The
 [sensor-location ingestion guide](docs/sensor-location-ingestion-cn.md) documents
 the live source mapping, dry run, transactional import, and spatial checks.
+The [hourly-count ingestion guide](docs/hourly-count-ingestion-cn.md) documents
+bounded CSV streaming, zero-count semantics, unknown IDs, and idempotency.
 
 Use Node.js 20 or newer for the frontend and Python 3.12 (or another compatible
 modern Python 3 release) for the backend.
@@ -136,6 +139,7 @@ From the repository root:
 .\backend\.venv\Scripts\python.exe -m pytest
 .\backend\.venv\Scripts\python.exe .\scripts\check_database.py
 .\backend\.venv\Scripts\python.exe .\scripts\import_sensor_locations.py --dry-run
+.\backend\.venv\Scripts\python.exe .\scripts\import_hourly_counts.py --dry-run --start-date 2025-01-04 --end-date 2025-01-04
 cd frontend
 npm run build
 ```

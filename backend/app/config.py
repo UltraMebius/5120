@@ -124,6 +124,12 @@ class CityDataSettings:
             "pedestrian-counting-system-sensor-locations",
         )
     )
+    hourly_dataset_id: str = field(
+        default_factory=lambda: os.getenv(
+            "CITY_HOURLY_DATASET_ID",
+            "pedestrian-counting-system-monthly-counts-per-hour",
+        )
+    )
     request_timeout_seconds: float = field(
         default_factory=lambda: _read_float("CITY_DATA_TIMEOUT_SECONDS", 30.0)
     )
