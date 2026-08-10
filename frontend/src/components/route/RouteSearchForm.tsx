@@ -69,6 +69,7 @@ function RouteSearchForm({
   const [locationStatus, setLocationStatus] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const isLocatingRef = useRef(false);
+  const isSubmittingRef = useRef(false);
 
   async function useCurrentLocation() {
     if (isLocatingRef.current) {
@@ -139,6 +140,10 @@ function RouteSearchForm({
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    if (isLoading || isLocatingRef.current || isSubmittingRef.current) {
+      return;
+    }
+
     const trimmedOrigin = origin.text.trim();
     const trimmedDestination = destination.text.trim();
     const nextErrors: FormErrors = {};
@@ -166,10 +171,13 @@ function RouteSearchForm({
       return;
     }
 
+    isSubmittingRef.current = true;
     void onSearch({
       destination: destination.selectedLocation,
       origin: origin.selectedLocation,
       preference,
+    }).finally(() => {
+      isSubmittingRef.current = false;
     });
   }
 

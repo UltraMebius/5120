@@ -5,6 +5,7 @@ from backend.app.api.routes import (
     get_route_crowd_ranking_service,
     get_walking_routing_service,
 )
+from backend.app.db.exceptions import DatabaseQueryError
 from backend.app.main import app
 from backend.app.models.crowd import (
     CrowdLevel,
@@ -77,6 +78,11 @@ class FailingWalkingRoutingService:
 
     def find_routes(self, **coordinates):
         raise self.error
+
+
+class FailingRouteCrowdRankingService:
+    def rank_routes(self, routes, preference):
+        raise DatabaseQueryError("private database connection detail")
 
 
 class TwoRouteWalkingRoutingService(FakeWalkingRoutingService):
@@ -481,3 +487,25 @@ def test_route_failure_is_sanitized_and_health_remains_available(
     assert "secret" not in route_response.text
     assert health_response.status_code == 200
     assert health_response.json() == {"status": "ok"}
+
+
+def test_crowd_database_failure_is_not_converted_or_exposed() -> None:
+    app.dependency_overrides[get_walking_routing_service] = (
+        FakeWalkingRoutingService
+    )
+    app.dependency_overrides[get_route_crowd_ranking_service] = (
+        FailingRouteCrowdRankingService
+    )
+    client = TestClient(app, raise_server_exceptions=False)
+    try:
+        route_response = client.post(
+            "/api/v1/routes/walking", json=VALID_REQUEST
+        )
+        health_response = client.get("/health")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert route_response.status_code == 500
+    assert route_response.text == "Internal Server Error"
+    assert "database connection detail" not in route_response.text
+    assert health_response.status_code == 200

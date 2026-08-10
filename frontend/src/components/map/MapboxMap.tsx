@@ -73,7 +73,10 @@ function MapboxMap() {
       {!configured && (
         <div className="search-map__message" role="status">
           <strong>Map unavailable</strong>
-          <span>The map is currently unavailable. You can still plan a route.</span>
+          <span>
+            The map and place search are currently unavailable. Please try
+            again later.
+          </span>
         </div>
       )}
 
