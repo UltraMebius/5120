@@ -7,17 +7,8 @@ const publicToken = (
 const MELBOURNE_CBD_PROXIMITY = "144.9631,-37.8136";
 
 export const MAPBOX_CONFIG = Object.freeze({
-  directionsBaseUrl: "https://api.mapbox.com/directions/v5",
-  directionsProfile: "mapbox/walking",
   geocodingBaseUrl: "https://api.mapbox.com/search/geocode/v6",
   publicToken: publicToken ?? "",
-  routeRequest: Object.freeze({
-    alternatives: true,
-    geometries: "geojson",
-    language: "en",
-    overview: "full",
-    steps: true,
-  }),
   searchBoxBaseUrl: "https://api.mapbox.com/search/searchbox/v1",
   searchBoxRequest: Object.freeze({
     country: "AU",

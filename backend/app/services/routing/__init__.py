@@ -1,5 +1,9 @@
-"""Walking route candidate and crowd-ranking service boundary."""
+"""Walking route acquisition service boundary."""
 
-from .preview_service import get_preview_routes
+from .mapbox_directions_client import MapboxDirectionsClient
+from .routing_service import WalkingRoutingService
 
-__all__ = ["get_preview_routes"]
+__all__ = [
+    "MapboxDirectionsClient",
+    "WalkingRoutingService",
+]

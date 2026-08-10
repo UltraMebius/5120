@@ -152,6 +152,26 @@ class CityDataSettings:
 
 
 @dataclass(frozen=True)
+class MapboxDirectionsSettings:
+    """Backend-owned Mapbox walking Directions configuration."""
+
+    access_token: str = field(
+        default_factory=lambda: os.getenv("MAPBOX_ACCESS_TOKEN", "").strip()
+    )
+    base_url: str = "https://api.mapbox.com/directions/v5"
+    profile: str = field(
+        default_factory=lambda: os.getenv(
+            "MAPBOX_DIRECTIONS_PROFILE", "mapbox/walking"
+        ).strip()
+    )
+    timeout_seconds: float = field(
+        default_factory=lambda: _read_float(
+            "MAPBOX_DIRECTIONS_TIMEOUT_SECONDS", 15.0
+        )
+    )
+
+
+@dataclass(frozen=True)
 class RealtimeSettings:
     """Confirmed polling/window settings plus optional operational freshness."""
 
@@ -180,8 +200,8 @@ class Settings:
         default_factory=lambda: os.getenv("DATABASE_URL", "")
     )
     frontend_origins: tuple[str, ...] = field(default_factory=_read_origins)
-    mapbox_access_token: str = field(
-        default_factory=lambda: os.getenv("MAPBOX_ACCESS_TOKEN", "")
+    mapbox_directions: MapboxDirectionsSettings = field(
+        default_factory=MapboxDirectionsSettings
     )
     bands: CrowdBandSettings = field(default_factory=CrowdBandSettings)
     preferences: CrowdPreferenceSettings = field(

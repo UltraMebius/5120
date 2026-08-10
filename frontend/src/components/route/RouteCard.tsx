@@ -1,5 +1,8 @@
 import type { WalkingRoute } from "../../types/route";
-import CrowdBadge from "../crowd/CrowdBadge";
+import {
+  formatWalkingDistance,
+  formatWalkingDuration,
+} from "../../utils/formatRoute";
 
 interface RouteCardProps {
   onDepart: (route: WalkingRoute) => void;
@@ -8,28 +11,22 @@ interface RouteCardProps {
 
 function RouteCard({ onDepart, route }: RouteCardProps) {
   return (
-    <article
-      className={`route-card${route.recommended ? " route-card--recommended" : ""}`}
-    >
+    <article className="route-card">
       <div className="route-card__topline">
         <div>
-          {route.recommended && (
-            <span className="recommended-label">
-              <span aria-hidden="true">★</span> CalmWay preview recommendation
-            </span>
-          )}
+          <span className="route-source-label">Mapbox walking</span>
           <h2>{route.name}</h2>
         </div>
-        <CrowdBadge level={route.crowdLevel} />
+        <span className="crowd-pending-label">Crowd analysis pending</span>
       </div>
 
       <div className="route-card__stats">
         <div>
           <span className="route-stat__icon" aria-hidden="true">
-            ◇
+            ↔
           </span>
           <span>
-            <strong>{route.distanceKm.toFixed(1)} km</strong>
+            <strong>{formatWalkingDistance(route.distanceMeters)}</strong>
             <small>Walking distance</small>
           </span>
         </div>
@@ -38,16 +35,14 @@ function RouteCard({ onDepart, route }: RouteCardProps) {
             ◷
           </span>
           <span>
-            <strong>{route.durationMin} min</strong>
+            <strong>{formatWalkingDuration(route.durationSeconds)}</strong>
             <small>Estimated time</small>
           </span>
         </div>
       </div>
 
       <button
-        className={`button ${
-          route.recommended ? "button--primary" : "button--secondary"
-        } button--full`}
+        className="button button--secondary button--full"
         onClick={() => onDepart(route)}
         type="button"
       >

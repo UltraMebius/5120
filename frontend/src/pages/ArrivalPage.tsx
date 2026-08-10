@@ -1,8 +1,11 @@
 import { Link, useNavigate } from "react-router-dom";
 
 import { APP_CONFIG } from "../config";
-import CrowdBadge from "../components/crowd/CrowdBadge";
 import { useJourney } from "../context/JourneyContext";
+import {
+  formatWalkingDistance,
+  formatWalkingDuration,
+} from "../utils/formatRoute";
 
 function ArrivalPage() {
   const navigate = useNavigate();
@@ -45,21 +48,22 @@ function ArrivalPage() {
 
         <div className="arrival-stats">
           <div>
-            <span>Total time</span>
-            <strong>{route.durationMin} min</strong>
+            <span>Estimated time</span>
+            <strong>{formatWalkingDuration(route.durationSeconds)}</strong>
           </div>
           <div>
-            <span>Total distance</span>
-            <strong>{route.distanceKm.toFixed(1)} km</strong>
+            <span>Route distance</span>
+            <strong>{formatWalkingDistance(route.distanceMeters)}</strong>
           </div>
           <div>
             <span>Journey crowd load</span>
-            <CrowdBadge level={route.crowdLevel} />
+            <strong>Not evaluated</strong>
           </div>
         </div>
 
         <p className="preview-caption">
-          Phase 1 arrival preview using the selected mock route summary.
+          Navigation remains a preview; the route summary uses real Mapbox
+          distance and duration.
         </p>
 
         <button

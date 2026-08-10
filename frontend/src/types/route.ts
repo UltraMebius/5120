@@ -1,9 +1,4 @@
-import type {
-  CoverageStatus,
-  CrowdPreference,
-  FrontendCrowdLevel,
-  InternalCrowdLevel,
-} from "./crowd";
+import type { CrowdPreference } from "./crowd";
 
 export interface Coordinate {
   latitude: number;
@@ -31,28 +26,31 @@ export interface LegacyJourneyLocation {
 
 export type JourneyLocation = MapboxJourneyLocation | LegacyJourneyLocation;
 
-export type ManeuverDirection = "LEFT" | "RIGHT" | "STRAIGHT";
+export interface GeoJsonLineString {
+  coordinates: [longitude: number, latitude: number][];
+  type: "LineString";
+}
 
-export interface Maneuver {
-  direction: ManeuverDirection;
-  distanceM: number;
+export interface WalkingRouteStep {
+  distanceMeters: number;
+  durationSeconds: number;
   instruction: string;
+  maneuverLocation: [longitude: number, latitude: number] | null;
 }
 
 export interface WalkingRoute {
-  coverageStatus?: CoverageStatus;
-  crowdLevel: FrontendCrowdLevel;
-  distanceKm: number;
-  durationMin: number;
+  distanceMeters: number;
+  durationSeconds: number;
+  geometry: GeoJsonLineString;
   id: string;
-  internalCrowdLevel?: InternalCrowdLevel;
-  maneuvers?: Maneuver[];
   name: string;
-  recommended: boolean;
+  routeIndex: number;
+  source: "MAPBOX";
+  steps: WalkingRouteStep[];
 }
 
 export interface WalkingRouteSearchRequest {
-  destination: JourneyLocation;
-  origin: JourneyLocation;
+  destination: MapboxJourneyLocation;
+  origin: MapboxJourneyLocation;
   preference: CrowdPreference;
 }

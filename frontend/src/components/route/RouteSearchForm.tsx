@@ -245,8 +245,8 @@ function RouteSearchForm({
       </div>
 
       <p className="integration-note">
-        Select both places from Mapbox suggestions. The next screen remains the
-        Phase 1 route preview; real walking directions are not requested yet.
+        Select both places from Mapbox suggestions. CalmWay will request real
+        walking routes through its backend; crowd ranking is not connected yet.
       </p>
 
       <CrowdPreferenceSelector onChange={setPreference} value={preference} />
@@ -261,7 +261,7 @@ function RouteSearchForm({
         disabled={isLoading}
         type="submit"
       >
-        {isLoading ? "Finding preview routes..." : "Find sensory-friendly routes"}
+        {isLoading ? "Loading walking routes..." : "Find walking routes"}
         <span aria-hidden="true">→</span>
       </button>
     </form>

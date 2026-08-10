@@ -811,6 +811,11 @@ input[aria-invalid="true"] {
   gap: 20px;
 }
 
+.route-list--single {
+  max-width: 660px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .route-card {
   display: flex;
   min-height: 285px;
@@ -820,11 +825,6 @@ input[aria-invalid="true"] {
   border-radius: 18px;
   background: #fff;
   box-shadow: 0 12px 32px rgb(39 66 59 / 6%);
-}
-
-.route-card--recommended {
-  border: 2px solid #72a995;
-  box-shadow: 0 15px 38px rgb(39 91 76 / 11%);
 }
 
 .route-card__topline {
@@ -841,12 +841,27 @@ input[aria-invalid="true"] {
   letter-spacing: -0.025em;
 }
 
-.recommended-label {
+.route-source-label {
   color: var(--brand);
   font-size: 0.7rem;
   font-weight: 900;
   letter-spacing: 0.025em;
   text-transform: uppercase;
+}
+
+.crowd-pending-label {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 28px;
+  padding: 5px 9px;
+  border: 1px solid #d6e1dc;
+  border-radius: 999px;
+  color: #5f6f6a;
+  background: #f5f8f6;
+  font-size: 0.68rem;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .route-card__stats {
@@ -892,6 +907,25 @@ input[aria-invalid="true"] {
 
 .route-card > .button {
   margin-top: auto;
+}
+
+.route-development-check {
+  display: grid;
+  gap: 5px;
+  margin-top: 20px;
+  padding: 12px 14px;
+  border: 1px dashed #b8c9c3;
+  border-radius: 10px;
+  color: #586964;
+  background: #f8faf9;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono",
+    monospace;
+  font-size: 0.72rem;
+  line-height: 1.55;
+}
+
+.route-development-check strong {
+  color: #365349;
 }
 
 .empty-state {
@@ -1608,6 +1642,10 @@ input[aria-invalid="true"] {
   }
 
   .navigation-status__summary .crowd-badge {
+    grid-column: 1 / -1;
+  }
+
+  .navigation-status__summary .crowd-pending-label {
     grid-column: 1 / -1;
   }
 

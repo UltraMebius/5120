@@ -1,11 +1,12 @@
 import { Link, useNavigate } from "react-router-dom";
 
 import CrowdAlertPanel from "../components/crowd/CrowdAlertPanel";
-import CrowdBadge from "../components/crowd/CrowdBadge";
 import NavigationMapPreview from "../components/map/NavigationMapPreview";
 import { useJourney } from "../context/JourneyContext";
-
-const CROWD_ORDER = { LOW: 0, MEDIUM: 1, HIGH: 2 } as const;
+import {
+  formatWalkingDistance,
+  formatWalkingDuration,
+} from "../utils/formatRoute";
 
 function NavigationPage() {
   const navigate = useNavigate();
@@ -17,7 +18,7 @@ function NavigationPage() {
       <main className="standalone-state">
         <div className="empty-state">
           <span className="empty-state__icon" aria-hidden="true">
-            ↑
+            ↗
           </span>
           <h1>No active journey</h1>
           <p>Choose a route before starting navigation.</p>
@@ -29,16 +30,12 @@ function NavigationPage() {
     );
   }
 
-  const nextManeuver = route.maneuvers?.[0] ?? {
-    direction: "LEFT" as const,
-    distanceM: 120,
-    instruction: "Turn left onto Swanston Street",
+  const nextStep = route.steps[0] ?? {
+    distanceMeters: 0,
+    durationSeconds: 0,
+    instruction: "Continue along the selected walking route",
+    maneuverLocation: null,
   };
-  const alternativeAvailable = journey.routes.some(
-    (candidate) =>
-      candidate.id !== route.id &&
-      CROWD_ORDER[candidate.crowdLevel] < CROWD_ORDER[route.crowdLevel],
-  );
 
   return (
     <div className="navigation-page">
@@ -56,7 +53,7 @@ function NavigationPage() {
           <strong>{journey.destination.label}</strong>
         </div>
         <span className="navigation-header__mode" aria-label="Walking route">
-          ♙
+          Walk
         </span>
       </header>
 
@@ -65,29 +62,25 @@ function NavigationPage() {
 
         <section className="maneuver-card" aria-label="Next walking direction">
           <div className="maneuver-card__arrow" aria-hidden="true">
-            {nextManeuver.direction === "LEFT"
-              ? "↰"
-              : nextManeuver.direction === "RIGHT"
-                ? "↱"
-                : "↑"}
+            ↑
           </div>
           <div>
-            <span>In {nextManeuver.distanceM} m</span>
-            <h1>{nextManeuver.instruction}</h1>
+            <span>In {Math.round(nextStep.distanceMeters)} m</span>
+            <h1>{nextStep.instruction}</h1>
           </div>
         </section>
 
         <section className="navigation-status">
           <div className="navigation-status__summary">
             <div>
-              <strong>{route.durationMin} min</strong>
-              <span>remaining</span>
+              <strong>{formatWalkingDuration(route.durationSeconds)}</strong>
+              <span>estimated</span>
             </div>
             <div>
-              <strong>{route.distanceKm.toFixed(1)} km</strong>
-              <span>remaining</span>
+              <strong>{formatWalkingDistance(route.distanceMeters)}</strong>
+              <span>route distance</span>
             </div>
-            <CrowdBadge level={route.crowdLevel} />
+            <span className="crowd-pending-label">Crowd analysis pending</span>
           </div>
 
           <div className="progress-block">
@@ -96,7 +89,7 @@ function NavigationPage() {
               <strong>Preview</strong>
             </div>
             <div
-              aria-label="Route progress is a Phase 1 preview"
+              aria-label="Route progress is a navigation preview"
               className="progress-track"
               role="progressbar"
               aria-valuemax={100}
@@ -114,10 +107,10 @@ function NavigationPage() {
           )}
 
           <details className="preview-controls">
-            <summary>Phase 1 state previews</summary>
+            <summary>Later-phase UI previews</summary>
             <p>
-              These controls demonstrate the alert and arrival screens without
-              claiming live GPS or crowd re-evaluation.
+              Navigation remains a placeholder. No live GPS, route drawing or
+              crowd re-evaluation has occurred.
             </p>
             <div>
               <button
@@ -125,7 +118,7 @@ function NavigationPage() {
                 onClick={journey.showAlertPreview}
                 type="button"
               >
-                Preview crowd alert
+                Preview future crowd alert
               </button>
               <button
                 className="button button--secondary"
@@ -141,7 +134,7 @@ function NavigationPage() {
 
       {journey.alertVisible && (
         <CrowdAlertPanel
-          alternativeAvailable={alternativeAvailable}
+          alternativeAvailable={false}
           onContinue={journey.continueCurrentRoute}
           onStartAlternative={journey.startPreviewAlternative}
         />

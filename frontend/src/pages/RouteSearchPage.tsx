@@ -22,11 +22,9 @@ function RouteSearchPage() {
       const routes = await findWalkingRoutes(request);
       journey.setSearchResults(request, routes);
       navigate("/routes/options");
-    } catch (requestError) {
-      console.error("Unable to load route preview:", requestError);
-      setError(
-        "Unable to load preview routes. Check that the CalmWay backend is running and try again.",
-      );
+    } catch {
+      console.error("Unable to load walking routes.");
+      setError("Walking routes could not be loaded. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -40,10 +38,10 @@ function RouteSearchPage() {
           <p className="eyebrow">Melbourne CBD · Walking</p>
           <h1>Find a calmer way there</h1>
           <p>
-            Compare walking routes by relative pedestrian activity and choose
-            the crowd level that feels right for your journey.
+            Compare real walking distance and estimated time. Your crowd
+            tolerance is saved for later route analysis.
           </p>
-          <span className="phase-pill">Epic 1 · Phase 3A place search</span>
+          <span className="phase-pill">Epic 1 · Phase 3B real directions</span>
         </section>
 
         {error && (

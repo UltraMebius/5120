@@ -53,8 +53,6 @@ const INITIAL_STATE: JourneyState = {
 
 const JourneyContext = createContext<JourneyContextValue | null>(null);
 
-const CROWD_ORDER = { LOW: 0, MEDIUM: 1, HIGH: 2 } as const;
-
 export function JourneyProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<JourneyState>(INITIAL_STATE);
 
@@ -65,7 +63,7 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
         setState((current) => ({
           ...current,
           alertVisible: false,
-          statusMessage: "Continuing the current preview route.",
+          statusMessage: "Continuing the selected walking route.",
         }));
       },
       resetJourney: () => setState(INITIAL_STATE),
@@ -109,40 +107,12 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
         }));
       },
       startPreviewAlternative: () => {
-        setState((current) => {
-          if (!current.selectedRoute) {
-            return current;
-          }
-
-          const selectedRoute = current.selectedRoute;
-          const alternative = [...current.routes]
-            .filter(
-              (route) =>
-                route.id !== selectedRoute.id &&
-                CROWD_ORDER[route.crowdLevel] <
-                  CROWD_ORDER[selectedRoute.crowdLevel],
-            )
-            .sort(
-              (left, right) =>
-                CROWD_ORDER[left.crowdLevel] - CROWD_ORDER[right.crowdLevel],
-            )[0];
-
-          if (!alternative) {
-            return {
-              ...current,
-              alertVisible: false,
-              statusMessage:
-                "No lower-crowd alternative is available in the Phase 1 preview.",
-            };
-          }
-
-          return {
-            ...current,
-            alertVisible: false,
-            selectedRoute: alternative,
-            statusMessage: `Preview route updated to ${alternative.name}.`,
-          };
-        });
+        setState((current) => ({
+          ...current,
+          alertVisible: false,
+          statusMessage:
+            "Crowd-based alternatives are not evaluated in Phase 3B.",
+        }));
       },
     }),
     [state],
