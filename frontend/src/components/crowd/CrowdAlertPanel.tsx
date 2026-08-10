@@ -1,65 +1,82 @@
-import CrowdBadge from "./CrowdBadge";
+import type { FrontendCrowdLevel } from "../../types/crowd";
+import type { InitialCrowdAlert, WalkingRoute } from "../../types/route";
 
 interface CrowdAlertPanelProps {
-  alternativeAvailable: boolean;
+  alert: InitialCrowdAlert;
+  alternative: WalkingRoute | null;
   onContinue: () => void;
   onStartAlternative: () => void;
+  toleranceLevel: FrontendCrowdLevel;
 }
 
 function CrowdAlertPanel({
-  alternativeAvailable,
+  alert,
+  alternative,
   onContinue,
   onStartAlternative,
+  toleranceLevel,
 }: CrowdAlertPanelProps) {
+  const triggerRange =
+    alert.triggerStartDistanceMeters !== null &&
+    alert.triggerEndDistanceMeters !== null
+      ? `${Math.round(alert.triggerStartDistanceMeters)}–${Math.round(
+          alert.triggerEndDistanceMeters,
+        )} m from this route's start`
+      : null;
+
   return (
-    <div className="alert-backdrop" role="presentation">
-      <section
-        aria-labelledby="crowd-alert-title"
-        aria-modal="true"
-        className="crowd-alert"
-        role="dialog"
-      >
+    <section
+      aria-labelledby="crowd-alert-title"
+      className="crowd-alert"
+      role="alert"
+    >
+      <div className="crowd-alert__heading">
         <div className="crowd-alert__icon" aria-hidden="true">
           !
         </div>
-        <p className="eyebrow">Upcoming crowd alert</p>
-        <h2 id="crowd-alert-title">Busier activity ahead</h2>
-        <div className="crowd-alert__level">
-          <CrowdBadge level="HIGH" />
-          <span>Above your selected preference</span>
+        <div>
+          <p className="eyebrow">Initial route-ahead crowd check</p>
+          <h2 id="crowd-alert-title">Busier pedestrian activity ahead</h2>
         </div>
-        <p>
-          Near-real-time pedestrian conditions on the route ahead exceed your
-          selected crowd tolerance. A lower-stimulation alternative can be
-          used when one is available.
+      </div>
+      <p>
+        CalmWay detected sustained pedestrian activity above your selected
+        crowd preference within the next{" "}
+        {Math.round(alert.lookAheadDistanceMeters)} m.
+      </p>
+      <p className="crowd-alert__detail">
+        Crowd activity is above your {toleranceLevel} preference ahead.
+        {triggerRange && <> Detected approximately {triggerRange}.</>}
+      </p>
+      {!alternative && (
+        <p className="crowd-alert__note">
+          No qualifying lower-stimulation alternative is available among the
+          routes already returned for this search.
         </p>
-        {!alternativeAvailable && (
-          <p className="crowd-alert__note">
-            No lower-crowd alternative is available in this Phase 1 preview.
-          </p>
-        )}
-        <div className="crowd-alert__actions">
+      )}
+      <div className="crowd-alert__actions">
+        {alternative && (
           <button
             className="button button--primary"
-            disabled={!alternativeAvailable}
             onClick={onStartAlternative}
             type="button"
           >
             Start lower-stimulation route
           </button>
-          <button
-            className="button button--secondary"
-            onClick={onContinue}
-            type="button"
-          >
-            Continue current route
-          </button>
-        </div>
-        <p className="preview-caption">
-          Phase 1 state preview — no live crowd re-evaluation has occurred.
-        </p>
-      </section>
-    </div>
+        )}
+        <button
+          className="button button--secondary"
+          onClick={onContinue}
+          type="button"
+        >
+          Continue current route
+        </button>
+      </div>
+      <p className="preview-caption">
+        This is an initial check at 0 m route progress. It does not track live
+        location or update while you walk.
+      </p>
+    </section>
   );
 }
 

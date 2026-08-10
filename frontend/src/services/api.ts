@@ -1,6 +1,9 @@
 import { APP_CONFIG } from "../config";
 import type {
   GeoJsonLineString,
+  InitialCrowdAlert,
+  RouteCrowdAlertDecision,
+  RouteCrowdAlertReason,
   RoutePreferenceStatus,
   RouteRankingStatus,
   WalkingRoute,
@@ -33,6 +36,12 @@ function isPercentage(value: unknown): value is number {
 
 function isNullablePercentage(value: unknown): value is number | null {
   return value === null || isPercentage(value);
+}
+
+function isNullableNonNegativeFiniteNumber(
+  value: unknown,
+): value is number | null {
+  return value === null || isNonNegativeFiniteNumber(value);
 }
 
 function isNonNegativeInteger(value: unknown): value is number {
@@ -70,6 +79,109 @@ function isRankingStatus(value: unknown): value is RouteRankingStatus {
     "INSUFFICIENT_DATA",
     "VALIDATED",
   ].includes(value as string);
+}
+
+function isAlertDecision(value: unknown): value is RouteCrowdAlertDecision {
+  return ["ALERT", "CLEAR", "INSUFFICIENT_DATA"].includes(value as string);
+}
+
+function isAlertReason(value: unknown): value is RouteCrowdAlertReason {
+  return [
+    "CONSECUTIVE_ABOVE_PREFERENCE_DETECTED",
+    "NO_CONSECUTIVE_ABOVE_PREFERENCE",
+    "NO_USABLE_LOOK_AHEAD_CROWD_DATA",
+    "NO_SAMPLES_AHEAD",
+  ].includes(value as string);
+}
+
+function parseInitialCrowdAlert(value: unknown): InitialCrowdAlert | null {
+  if (
+    !isRecord(value) ||
+    !isAlertDecision(value.decision) ||
+    !isAlertReason(value.reason) ||
+    !isCrowdPreference(value.preference) ||
+    !isPercentage(value.threshold) ||
+    value.currentProgressMeters !== 0 ||
+    !isNonNegativeFiniteNumber(value.lookAheadDistanceMeters) ||
+    value.lookAheadDistanceMeters === 0 ||
+    !isNonNegativeInteger(value.totalLookAheadSamples) ||
+    !isNonNegativeInteger(value.numericLookAheadSamples) ||
+    value.numericLookAheadSamples > value.totalLookAheadSamples ||
+    !isNullablePercentage(value.lookAheadCoveragePct) ||
+    !isNullablePercentage(value.pctAbovePreference) ||
+    !isNullableNonNegativeFiniteNumber(value.triggerStartDistanceMeters) ||
+    !isNullableNonNegativeFiniteNumber(value.triggerEndDistanceMeters) ||
+    !(
+      value.triggerSampleCount === null ||
+      (isNonNegativeInteger(value.triggerSampleCount) &&
+        value.triggerSampleCount >= 2)
+    ) ||
+    !isNullablePercentage(value.maximumExposureInTrigger)
+  ) {
+    return null;
+  }
+
+  const triggerIsComplete =
+    value.triggerStartDistanceMeters !== null &&
+    value.triggerEndDistanceMeters !== null &&
+    value.triggerStartDistanceMeters <= value.triggerEndDistanceMeters &&
+    value.triggerSampleCount !== null &&
+    value.maximumExposureInTrigger !== null;
+  const triggerIsAbsent =
+    value.triggerStartDistanceMeters === null &&
+    value.triggerEndDistanceMeters === null &&
+    value.triggerSampleCount === null &&
+    value.maximumExposureInTrigger === null;
+  const stateIsConsistent =
+    (value.decision === "ALERT" &&
+      value.reason === "CONSECUTIVE_ABOVE_PREFERENCE_DETECTED" &&
+      value.numericLookAheadSamples >= 2 &&
+      triggerIsComplete) ||
+    (value.decision === "CLEAR" &&
+      value.reason === "NO_CONSECUTIVE_ABOVE_PREFERENCE" &&
+      value.numericLookAheadSamples > 0 &&
+      triggerIsAbsent) ||
+    (value.decision === "INSUFFICIENT_DATA" &&
+      [
+        "NO_USABLE_LOOK_AHEAD_CROWD_DATA",
+        "NO_SAMPLES_AHEAD",
+      ].includes(value.reason) &&
+      value.numericLookAheadSamples === 0 &&
+      triggerIsAbsent);
+  const coverageIsConsistent =
+    value.totalLookAheadSamples === 0
+      ? value.lookAheadCoveragePct === null
+      : value.lookAheadCoveragePct !== null &&
+        Math.abs(
+          value.lookAheadCoveragePct -
+            (100 * value.numericLookAheadSamples) /
+              value.totalLookAheadSamples,
+        ) < 0.000001;
+  const percentageIsConsistent =
+    value.numericLookAheadSamples === 0
+      ? value.pctAbovePreference === null
+      : value.pctAbovePreference !== null;
+
+  if (!stateIsConsistent || !coverageIsConsistent || !percentageIsConsistent) {
+    return null;
+  }
+
+  return {
+    currentProgressMeters: value.currentProgressMeters,
+    decision: value.decision,
+    lookAheadCoveragePct: value.lookAheadCoveragePct,
+    lookAheadDistanceMeters: value.lookAheadDistanceMeters,
+    maximumExposureInTrigger: value.maximumExposureInTrigger,
+    numericLookAheadSamples: value.numericLookAheadSamples,
+    pctAbovePreference: value.pctAbovePreference,
+    preference: value.preference,
+    reason: value.reason,
+    threshold: value.threshold,
+    totalLookAheadSamples: value.totalLookAheadSamples,
+    triggerEndDistanceMeters: value.triggerEndDistanceMeters,
+    triggerSampleCount: value.triggerSampleCount,
+    triggerStartDistanceMeters: value.triggerStartDistanceMeters,
+  };
 }
 
 function parseCoordinatePair(
@@ -184,8 +296,9 @@ function parseRoute(value: unknown): WalkingRoute | null {
     return null;
   }
   const geometry = parseGeometry(value.geometry);
+  const initialCrowdAlert = parseInitialCrowdAlert(value.initialCrowdAlert);
   const steps = value.steps.map(parseStep);
-  if (!geometry || steps.some((step) => step === null)) {
+  if (!geometry || !initialCrowdAlert || steps.some((step) => step === null)) {
     return null;
   }
   return {
@@ -194,6 +307,7 @@ function parseRoute(value: unknown): WalkingRoute | null {
     durationSeconds: value.durationSeconds,
     geometry,
     id: value.id,
+    initialCrowdAlert,
     isRecommended: value.isRecommended,
     limitedCoveragePct: value.limitedCoveragePct,
     maximumCrowdExposureScore: value.maximumCrowdExposureScore,
@@ -277,6 +391,9 @@ export async function findWalkingRoutes(
       !parsedRoutes.some((route) => route.id === recommendedRouteId)) ||
     parsedRoutes.some(
       (route) => route.isRecommended !== (route.id === recommendedRouteId),
+    ) ||
+    parsedRoutes.some(
+      (route) => route.initialCrowdAlert.preference !== body.preference,
     ) ||
     (body.rankingStatus === "PROVISIONAL" && recommendedRouteId === null) ||
     (body.rankingStatus === "INSUFFICIENT_DATA" &&

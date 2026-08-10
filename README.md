@@ -1,7 +1,7 @@
 # CalmWay
 
 CalmWay is a responsive walking-route web application for sensory-sensitive
-commuters in Melbourne CBD. The project has completed **Epic 1 Phase 5B-1**. The
+commuters in Melbourne CBD. The project has completed **Epic 1 Phase 5B-2**. The
 frontend can use a one-shot browser geolocation or search for a real Mapbox
 starting point, request real walking candidates from the FastAPI backend,
 preview each returned LineString on Mapbox GL JS, and reuse the selected route
@@ -9,8 +9,9 @@ on the static Navigation screen. The backend measures
 and uniformly samples those LineStrings at the configured interval, evaluates
 each sample with the Phase 2D crowd point engine, then applies the project-
 approved coverage, P75, preference, and deterministic ranking policy.
-An offline domain service can now decide whether current sample-level evidence
-contains a qualifying above-preference streak in the next configured 300 m.
+The same per-route evaluation now also produces an initial route-ahead decision
+at 0 m, which Navigation presents without claiming live GPS progress. An alert
+may offer a strictly eligible route already present in the original response.
 
 ## Current Epic 1 flow
 
@@ -35,7 +36,7 @@ The root route temporarily redirects to Route Search. The Home page belongs to
 another team member; `VITE_HOME_ROUTE` is the integration boundary and no Home
 page is implemented here.
 
-## Implemented through Phase 5B-1
+## Implemented through Phase 5B-2
 
 - React Router page structure and a small Journey Context;
 - responsive desktop/mobile UI for the complete Epic 1 flow;
@@ -55,7 +56,10 @@ page is implemented here.
 - honest insufficient-data route cards and backend-owned CalmWay recommendation;
 - a pure, deterministic ahead-of-route `ALERT` / `CLEAR` /
   `INSUFFICIENT_DATA` decision engine with explicit partial-data diagnostics;
-- static Navigation maneuver, alert, alternative, and arrival preview states;
+- initial Navigation alert, clear, and unavailable states using the backend
+  decision at exactly 0 m route progress;
+- route-specific in-memory alert acknowledgement and strict switching to the
+  first eligible, real lower-P75 alternative in existing backend order;
 - PostgreSQL/PostGIS ingestion, baselines, current activity, and point-level
   crowd evaluation from Phases 2A–2D.
 
@@ -64,7 +68,7 @@ page is implemented here.
 The application still does **not** perform:
 
 - continuous GPS navigation, periodic crowd re-evaluation, or rerouting;
-- frontend crowd-alert presentation or alternative-route switching;
+- live progress-driven crowd re-evaluation;
 - deployment.
 
 The Navigation screen is explicitly a static route overview and does not claim
@@ -137,6 +141,10 @@ The [Phase 5B-1 decision record](docs/phase5b-crowd-alert-decisions.md) and
 [Simplified Chinese implementation guide](docs/route-crowd-alert-phase5b1-cn.md)
 document the provisional 300 m/two-consecutive-sample heuristic, decision
 semantics, diagnostics, and static-navigation boundary.
+The [Phase 5B-2 Navigation decision record](docs/phase5b2-navigation-alert-decisions.md)
+and [Simplified Chinese Navigation guide](docs/navigation-crowd-alert-phase5b2-cn.md)
+document initial progress, the three UI states, acknowledgement, and the strict
+existing-alternative switch rule.
 
 Use Node.js 20 or newer for the frontend and Python 3.12 (or another compatible
 modern Python 3 release) for the backend.

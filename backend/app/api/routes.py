@@ -4,10 +4,16 @@ from functools import lru_cache
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from ..models.crowd import CrowdPreference
 from ..schemas.routes import (
+    InitialCrowdAlert,
     WalkingRouteOption,
     WalkingRouteRequest,
     WalkingRoutesResponse,
+)
+from ..services.routing.route_crowd_alert_service import (
+    RouteCrowdAlertDecision,
+    RouteCrowdAlertService,
 )
 from ..services.routing.mapbox_directions_client import (
     MapboxDirectionsConfigurationError,
@@ -41,10 +47,49 @@ def get_route_crowd_ranking_service() -> RouteCrowdRankingService:
     return RouteCrowdRankingService()
 
 
-def _enriched_route(result: RankedRouteCrowdResult) -> WalkingRouteOption:
+@lru_cache
+def get_route_crowd_alert_service() -> RouteCrowdAlertService:
+    """Construct the pure initial route-ahead decision service."""
+
+    return RouteCrowdAlertService()
+
+
+def _public_initial_alert(
+    decision: RouteCrowdAlertDecision,
+) -> InitialCrowdAlert:
+    return InitialCrowdAlert(
+        decision=decision.decision,
+        reason=decision.reason,
+        preference=decision.preference,
+        threshold=decision.threshold,
+        currentProgressMeters=decision.current_progress_meters,
+        lookAheadDistanceMeters=decision.look_ahead_distance_meters,
+        totalLookAheadSamples=decision.total_look_ahead_samples,
+        numericLookAheadSamples=decision.numeric_look_ahead_samples,
+        lookAheadCoveragePct=decision.look_ahead_coverage_pct,
+        pctAbovePreference=decision.pct_above_preference_in_window,
+        triggerStartDistanceMeters=decision.trigger_start_distance_meters,
+        triggerEndDistanceMeters=decision.trigger_end_distance_meters,
+        triggerSampleCount=decision.trigger_sample_count,
+        maximumExposureInTrigger=decision.maximum_exposure_in_trigger,
+    )
+
+
+def _enriched_route(
+    result: RankedRouteCrowdResult,
+    *,
+    alert_service: RouteCrowdAlertService,
+    preference: CrowdPreference,
+) -> WalkingRouteOption:
     summary = result.summary
+    initial_alert = alert_service.evaluate_ahead(
+        result.evaluation,
+        preference,
+        current_progress_meters=0.0,
+    )
     return result.route.model_copy(
         update={
+            "initialCrowdAlert": _public_initial_alert(initial_alert),
             "routeCrowdLevel": summary.route_crowd_level,
             "routeCrowdPresentationLevel": (
                 summary.route_crowd_presentation_level
@@ -79,6 +124,9 @@ def list_walking_routes(
     ranking_service: RouteCrowdRankingService = Depends(
         get_route_crowd_ranking_service
     ),
+    alert_service: RouteCrowdAlertService = Depends(
+        get_route_crowd_alert_service
+    ),
 ) -> WalkingRoutesResponse:
     """Return real Mapbox routes in backend-owned crowd-ranking order."""
 
@@ -108,7 +156,14 @@ def list_walking_routes(
     ranking = ranking_service.rank_routes(routes, request.preference)
     return WalkingRoutesResponse(
         preference=request.preference,
-        routes=[_enriched_route(result) for result in ranking.routes],
+        routes=[
+            _enriched_route(
+                result,
+                alert_service=alert_service,
+                preference=request.preference,
+            )
+            for result in ranking.routes
+        ],
         recommendedRouteId=ranking.recommended_route_id,
         rankingStatus=ranking.ranking_status,
     )

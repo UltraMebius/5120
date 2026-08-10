@@ -15,6 +15,34 @@ export type RouteRankingStatus =
   | "INSUFFICIENT_DATA"
   | "VALIDATED";
 
+export type RouteCrowdAlertDecision =
+  | "ALERT"
+  | "CLEAR"
+  | "INSUFFICIENT_DATA";
+
+export type RouteCrowdAlertReason =
+  | "CONSECUTIVE_ABOVE_PREFERENCE_DETECTED"
+  | "NO_CONSECUTIVE_ABOVE_PREFERENCE"
+  | "NO_USABLE_LOOK_AHEAD_CROWD_DATA"
+  | "NO_SAMPLES_AHEAD";
+
+export interface InitialCrowdAlert {
+  currentProgressMeters: number;
+  decision: RouteCrowdAlertDecision;
+  lookAheadCoveragePct: number | null;
+  lookAheadDistanceMeters: number;
+  maximumExposureInTrigger: number | null;
+  numericLookAheadSamples: number;
+  pctAbovePreference: number | null;
+  preference: CrowdPreference;
+  reason: RouteCrowdAlertReason;
+  threshold: number;
+  totalLookAheadSamples: number;
+  triggerEndDistanceMeters: number | null;
+  triggerSampleCount: number | null;
+  triggerStartDistanceMeters: number | null;
+}
+
 export interface Coordinate {
   latitude: number;
   longitude: number;
@@ -61,6 +89,7 @@ export interface WalkingRoute {
   durationSeconds: number;
   geometry: GeoJsonLineString;
   id: string;
+  initialCrowdAlert: InitialCrowdAlert;
   isRecommended: boolean;
   limitedCoveragePct: number;
   maximumCrowdExposureScore: number | null;

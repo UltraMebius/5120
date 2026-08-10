@@ -386,6 +386,35 @@ def test_reversing_input_does_not_change_backend_ranking() -> None:
     assert [item.route.id for item in reverse.routes] == ["quiet", "busy"]
 
 
+def test_ranking_carries_each_exact_evaluation_without_recomputing() -> None:
+    routes = [_route("quiet", 0), _route("busy", 1)]
+    evaluations = {
+        "quiet": _evaluation("quiet", [("SUPPORTED", 30.0)] * 3),
+        "busy": _evaluation("busy", [("SUPPORTED", 80.0)] * 3),
+    }
+    evaluation_service = FakeEvaluationService(evaluations)
+    service = RouteCrowdRankingService(
+        evaluation_service,
+        minimum_coverage_pct=55.0,
+        preference_thresholds={
+            CrowdPreference.AVOID_BUSY: 50.0,
+            CrowdPreference.PREFER_QUIETER: 75.0,
+            CrowdPreference.FLEXIBLE: 90.0,
+        },
+    )
+
+    result = service.rank_routes(routes, CrowdPreference.AVOID_BUSY)
+
+    assert evaluation_service.calls == ["quiet", "busy"]
+    assert {
+        item.route.id: item.evaluation for item in result.routes
+    } == evaluations
+    assert all(
+        item.evaluation is evaluations[item.route.id]
+        for item in result.routes
+    )
+
+
 def test_multiple_current_materialisations_are_an_error_not_insufficient_data() -> None:
     routes = [_route("first", 0), _route("second", 1)]
     evaluations = {

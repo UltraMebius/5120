@@ -10,6 +10,8 @@ from ..models.crowd import (
     FrontendCrowdLevel,
     RoutePreferenceStatus,
     RouteRankingStatus,
+    RouteCrowdAlertReason,
+    RouteCrowdAlertState,
 )
 
 
@@ -35,6 +37,27 @@ class WalkingRouteStep(BaseModel):
     distanceMeters: float = Field(ge=0, allow_inf_nan=False)
     durationSeconds: float = Field(ge=0, allow_inf_nan=False)
     maneuverLocation: tuple[float, float] | None = None
+
+
+class InitialCrowdAlert(BaseModel):
+    decision: RouteCrowdAlertState
+    reason: RouteCrowdAlertReason
+    preference: CrowdPreference
+    threshold: float = Field(ge=0, le=100, allow_inf_nan=False)
+    currentProgressMeters: float = Field(ge=0, allow_inf_nan=False)
+    lookAheadDistanceMeters: float = Field(gt=0, allow_inf_nan=False)
+    totalLookAheadSamples: int = Field(ge=0)
+    numericLookAheadSamples: int = Field(ge=0)
+    lookAheadCoveragePct: float | None = Field(default=None, ge=0, le=100)
+    pctAbovePreference: float | None = Field(default=None, ge=0, le=100)
+    triggerStartDistanceMeters: float | None = Field(default=None, ge=0)
+    triggerEndDistanceMeters: float | None = Field(default=None, ge=0)
+    triggerSampleCount: int | None = Field(default=None, ge=2)
+    maximumExposureInTrigger: float | None = Field(
+        default=None,
+        ge=0,
+        le=100,
+    )
 
 
 class WalkingRouteOption(BaseModel):
@@ -69,6 +92,7 @@ class WalkingRouteOption(BaseModel):
     numericSampleCount: int | None = Field(default=None, ge=0)
     rank: int | None = Field(default=None, ge=1)
     isRecommended: bool = False
+    initialCrowdAlert: InitialCrowdAlert | None = None
 
 
 class WalkingRoutesResponse(BaseModel):

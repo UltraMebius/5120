@@ -2,34 +2,19 @@
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from enum import Enum
 import math
 
 from ...config import SETTINGS
-from ...models.crowd import CoverageStatus, CrowdPreference
+from ...models.crowd import (
+    CoverageStatus,
+    CrowdPreference,
+    RouteCrowdAlertReason,
+    RouteCrowdAlertState,
+)
 from .route_crowd_evaluation_service import (
     RouteCrowdEvaluation,
     RouteSampleCrowdResult,
 )
-
-
-class RouteCrowdAlertState(str, Enum):
-    """Exhaustive Phase 5B-1 decision states."""
-
-    ALERT = "ALERT"
-    CLEAR = "CLEAR"
-    INSUFFICIENT_DATA = "INSUFFICIENT_DATA"
-
-
-class RouteCrowdAlertReason(str, Enum):
-    """Stable internal explanations without infrastructure details."""
-
-    CONSECUTIVE_ABOVE_PREFERENCE_DETECTED = (
-        "CONSECUTIVE_ABOVE_PREFERENCE_DETECTED"
-    )
-    NO_CONSECUTIVE_ABOVE_PREFERENCE = "NO_CONSECUTIVE_ABOVE_PREFERENCE"
-    NO_USABLE_LOOK_AHEAD_CROWD_DATA = "NO_USABLE_LOOK_AHEAD_CROWD_DATA"
-    NO_SAMPLES_AHEAD = "NO_SAMPLES_AHEAD"
 
 
 class RouteCrowdAlertConfigurationError(ValueError):

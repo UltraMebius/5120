@@ -57,6 +57,7 @@ class RankedRouteCrowdResult:
     """A source Mapbox route paired with its backend-owned decision."""
 
     route: WalkingRouteOption
+    evaluation: RouteCrowdEvaluation
     summary: RouteCrowdSummary
     rank: int | None
     is_recommended: bool
@@ -290,6 +291,7 @@ class RouteCrowdRankingService:
         evaluated = [
             (
                 route,
+                evaluation,
                 aggregate_route_crowd(
                     evaluation,
                     preference_threshold=threshold,
@@ -298,14 +300,14 @@ class RouteCrowdRankingService:
             )
             for route, evaluation in zip(routes, evaluations)
         ]
-        sufficient = [item for item in evaluated if item[1].evaluable]
-        insufficient = [item for item in evaluated if not item[1].evaluable]
+        sufficient = [item for item in evaluated if item[2].evaluable]
+        insufficient = [item for item in evaluated if not item[2].evaluable]
         sufficient.sort(
             key=lambda item: (
-                item[1].no_data_pct,
-                item[1].pct_above_preference,
-                item[1].p75_crowd_exposure_score,
-                item[1].maximum_crowd_exposure_score,
+                item[2].no_data_pct,
+                item[2].pct_above_preference,
+                item[2].p75_crowd_exposure_score,
+                item[2].maximum_crowd_exposure_score,
                 item[0].durationSeconds,
                 item[0].routeIndex,
             )
@@ -314,10 +316,14 @@ class RouteCrowdRankingService:
 
         recommended_route_id = sufficient[0][0].id if sufficient else None
         ordered: list[RankedRouteCrowdResult] = []
-        for index, (route, summary) in enumerate(sufficient, start=1):
+        for index, (route, evaluation, summary) in enumerate(
+            sufficient,
+            start=1,
+        ):
             ordered.append(
                 RankedRouteCrowdResult(
                     route=route,
+                    evaluation=evaluation,
                     summary=summary,
                     rank=index,
                     is_recommended=route.id == recommended_route_id,
@@ -326,11 +332,12 @@ class RouteCrowdRankingService:
         ordered.extend(
             RankedRouteCrowdResult(
                 route=route,
+                evaluation=evaluation,
                 summary=summary,
                 rank=None,
                 is_recommended=False,
             )
-            for route, summary in insufficient
+            for route, evaluation, summary in insufficient
         )
         return RouteCrowdRankingResult(
             routes=tuple(ordered),

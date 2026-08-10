@@ -16,7 +16,7 @@ import type {
 } from "../types/route";
 
 interface JourneyState {
-  alertVisible: boolean;
+  acknowledgedAlertRouteIds: string[];
   destination: JourneyLocation | null;
   origin: JourneyLocation | null;
   preference: CrowdPreference;
@@ -29,7 +29,7 @@ interface JourneyState {
 }
 
 interface JourneyContextValue extends JourneyState {
-  continueCurrentRoute: () => void;
+  acknowledgeCrowdAlert: (routeId: string) => void;
   resetJourney: () => void;
   selectRoute: (route: WalkingRoute) => void;
   setDraftLocation: (
@@ -40,12 +40,11 @@ interface JourneyContextValue extends JourneyState {
     request: WalkingRouteSearchRequest,
     result: WalkingRoutesResult,
   ) => void;
-  showAlertPreview: () => void;
-  startPreviewAlternative: () => void;
+  switchToAlternativeRoute: (route: WalkingRoute) => void;
 }
 
 const INITIAL_STATE: JourneyState = {
-  alertVisible: false,
+  acknowledgedAlertRouteIds: [],
   destination: null,
   origin: null,
   preference: "PREFER_QUIETER",
@@ -65,18 +64,28 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
   const value = useMemo<JourneyContextValue>(
     () => ({
       ...state,
-      continueCurrentRoute: () => {
-        setState((current) => ({
-          ...current,
-          alertVisible: false,
-          statusMessage: "Continuing the selected walking route.",
-        }));
+      acknowledgeCrowdAlert: (routeId) => {
+        setState((current) => {
+          if (current.selectedRoute?.id !== routeId) {
+            return current;
+          }
+          return {
+            ...current,
+            acknowledgedAlertRouteIds: current.acknowledgedAlertRouteIds.includes(
+              routeId,
+            )
+              ? current.acknowledgedAlertRouteIds
+              : [...current.acknowledgedAlertRouteIds, routeId],
+            statusMessage:
+              "Crowd alert acknowledged. Continuing the current route.",
+          };
+        });
       },
       resetJourney: () => setState(INITIAL_STATE),
       selectRoute: (route) => {
         setState((current) => ({
           ...current,
-          alertVisible: false,
+          acknowledgedAlertRouteIds: [],
           selectedRoute: route,
           startedAt: new Date().toISOString(),
           statusMessage: null,
@@ -86,7 +95,7 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
         setState((current) => ({
           ...current,
           [field]: location,
-          alertVisible: false,
+          acknowledgedAlertRouteIds: [],
           rankingStatus: "NOT_EVALUATED",
           recommendedRouteId: null,
           routes: [],
@@ -97,7 +106,7 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
       },
       setSearchResults: (request, result) => {
         setState({
-          alertVisible: false,
+          acknowledgedAlertRouteIds: [],
           destination: request.destination,
           origin: request.origin,
           preference: result.preference,
@@ -109,20 +118,21 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
           statusMessage: null,
         });
       },
-      showAlertPreview: () => {
-        setState((current) => ({
-          ...current,
-          alertVisible: true,
-          statusMessage: null,
-        }));
-      },
-      startPreviewAlternative: () => {
-        setState((current) => ({
-          ...current,
-          alertVisible: false,
-          statusMessage:
-            "Alternative route preview is not available in this static overview.",
-        }));
+      switchToAlternativeRoute: (route) => {
+        setState((current) => {
+          const existingRoute = current.routes.find(
+            (candidate) => candidate.id === route.id,
+          );
+          if (!existingRoute || existingRoute.id === current.selectedRoute?.id) {
+            return current;
+          }
+          return {
+            ...current,
+            selectedRoute: existingRoute,
+            statusMessage:
+              "Switched to an existing alternative from this route search.",
+          };
+        });
       },
     }),
     [state],

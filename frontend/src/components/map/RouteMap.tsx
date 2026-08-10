@@ -309,7 +309,7 @@ function RouteMap({ destination, origin, route, variant }: RouteMapProps) {
     <section
       aria-label={
         variant === "navigation"
-          ? "Selected walking route map"
+          ? `Selected walking route map: ${route.name}`
           : `Route preview for ${route.name}`
       }
       className={`route-map route-map--${variant}`}
