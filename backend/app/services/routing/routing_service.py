@@ -1,6 +1,6 @@
 """Normalize Mapbox walking routes into CalmWay request-scoped DTOs."""
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 import math
 from typing import Any
 
@@ -165,5 +165,19 @@ class WalkingRoutingService:
             origin_latitude=origin_latitude,
             destination_longitude=destination_longitude,
             destination_latitude=destination_latitude,
+        )
+        return self.normalize_routes(payload)
+
+    def find_routes_for_coordinates(
+        self,
+        coordinates: Sequence[tuple[float, float]],
+        *,
+        alternatives: bool = True,
+    ) -> list[WalkingRouteOption]:
+        """Normalize one origin/waypoints/destination Directions response."""
+
+        payload = self.client.fetch_directions_for_coordinates(
+            coordinates,
+            alternatives=alternatives,
         )
         return self.normalize_routes(payload)

@@ -52,6 +52,56 @@ def test_client_constructs_walking_url_coordinates_and_required_parameters() -> 
     assert request.url.params["access_token"] == "test-token"
 
 
+def test_coordinate_sequence_supports_one_waypoint_and_bounded_alternatives() -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json=_ok_payload())
+
+    http_client = httpx.Client(transport=httpx.MockTransport(handler))
+    client = MapboxDirectionsClient(
+        access_token="test-token",
+        base_url="https://directions.test/directions/v5",
+        client=http_client,
+    )
+    try:
+        client.fetch_directions_for_coordinates(
+            (
+                (144.9671, -37.8183),
+                (144.9650, -37.8140),
+                (144.9631, -37.8102),
+            ),
+            alternatives=False,
+        )
+    finally:
+        http_client.close()
+
+    assert len(requests) == 1
+    request = requests[0]
+    assert request.url.path.endswith(
+        "/144.9671,-37.8183;144.965,-37.814;144.9631,-37.8102"
+    )
+    assert request.url.params["alternatives"] == "false"
+
+
+@pytest.mark.parametrize(
+    "coordinates",
+    [
+        [(144.96, -37.81)],
+        [(144.96, -37.81), (181.0, -37.82)],
+        [(144.96, -37.81), (144.97, float("nan"))],
+    ],
+)
+def test_coordinate_sequence_rejects_invalid_input(coordinates) -> None:
+    client = MapboxDirectionsClient(access_token="test-token")
+    try:
+        with pytest.raises(ValueError, match="Mapbox"):
+            client.directions_url_for_coordinates(coordinates)
+    finally:
+        client.close()
+
+
 def test_missing_token_is_a_controlled_configuration_error() -> None:
     client = MapboxDirectionsClient(access_token="")
     try:

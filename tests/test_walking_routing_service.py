@@ -152,3 +152,96 @@ def test_missing_or_malformed_steps_do_not_break_route_acquisition() -> None:
 
     assert len(routes) == 1
     assert routes[0].steps == []
+
+
+def test_multiple_waypoint_legs_preserve_steps_in_leg_order() -> None:
+    route = _route()
+    route["legs"] = [
+        {
+            "steps": [
+                {
+                    "distance": 100,
+                    "duration": 70,
+                    "maneuver": {
+                        "instruction": "Walk to waypoint",
+                        "location": [144.9671, -37.8183],
+                    },
+                }
+            ]
+        },
+        {
+            "steps": [
+                {
+                    "distance": 200,
+                    "duration": 140,
+                    "maneuver": {
+                        "instruction": "Continue to destination",
+                        "location": [144.965, -37.814],
+                    },
+                }
+            ]
+        },
+    ]
+
+    routes = WalkingRoutingService.normalize_routes(
+        {"code": "Ok", "routes": [route]}
+    )
+
+    assert [step.instruction for step in routes[0].steps] == [
+        "Walk to waypoint",
+        "Continue to destination",
+    ]
+
+
+class RecordingClient:
+    def __init__(self):
+        self.two_point_calls = []
+        self.sequence_calls = []
+
+    def fetch_directions(self, **coordinates):
+        self.two_point_calls.append(coordinates)
+        return {"code": "Ok", "routes": [_route()]}
+
+    def fetch_directions_for_coordinates(self, coordinates, *, alternatives=True):
+        self.sequence_calls.append((tuple(coordinates), alternatives))
+        return {"code": "Ok", "routes": [_route()]}
+
+
+def test_existing_two_point_service_boundary_remains_unchanged() -> None:
+    client = RecordingClient()
+
+    routes = WalkingRoutingService(client).find_routes(
+        origin_longitude=144.96,
+        origin_latitude=-37.82,
+        destination_longitude=144.97,
+        destination_latitude=-37.81,
+    )
+
+    assert len(routes) == 1
+    assert client.two_point_calls == [
+        {
+            "origin_longitude": 144.96,
+            "origin_latitude": -37.82,
+            "destination_longitude": 144.97,
+            "destination_latitude": -37.81,
+        }
+    ]
+    assert client.sequence_calls == []
+
+
+def test_coordinate_sequence_service_boundary_preserves_waypoint() -> None:
+    client = RecordingClient()
+    coordinates = (
+        (144.96, -37.82),
+        (144.965, -37.815),
+        (144.97, -37.81),
+    )
+
+    routes = WalkingRoutingService(client).find_routes_for_coordinates(
+        coordinates,
+        alternatives=False,
+    )
+
+    assert len(routes) == 1
+    assert client.sequence_calls == [(coordinates, False)]
+    assert client.two_point_calls == []

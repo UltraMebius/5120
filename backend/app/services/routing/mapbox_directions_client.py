@@ -1,6 +1,7 @@
 """Backend-only HTTP client for Mapbox Walking Directions v5."""
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+import math
 from typing import Any
 
 import httpx
@@ -62,6 +63,34 @@ class MapboxDirectionsClient:
     def _format_coordinate(value: float) -> str:
         return f"{value:.8f}".rstrip("0").rstrip(".")
 
+    @staticmethod
+    def _validated_coordinates(
+        coordinates: Sequence[tuple[float, float]],
+    ) -> tuple[tuple[float, float], ...]:
+        if not 2 <= len(coordinates) <= 25:
+            raise ValueError("Mapbox Directions requires 2 to 25 coordinates")
+        validated: list[tuple[float, float]] = []
+        for coordinate in coordinates:
+            if not isinstance(coordinate, (list, tuple)) or len(coordinate) != 2:
+                raise ValueError("each Mapbox coordinate must be longitude/latitude")
+            longitude, latitude = coordinate
+            if (
+                isinstance(longitude, bool)
+                or not isinstance(longitude, (int, float))
+                or not math.isfinite(float(longitude))
+                or not -180.0 <= float(longitude) <= 180.0
+            ):
+                raise ValueError("Mapbox longitude must be finite and valid")
+            if (
+                isinstance(latitude, bool)
+                or not isinstance(latitude, (int, float))
+                or not math.isfinite(float(latitude))
+                or not -90.0 <= float(latitude) <= 90.0
+            ):
+                raise ValueError("Mapbox latitude must be finite and valid")
+            validated.append((float(longitude), float(latitude)))
+        return tuple(validated)
+
     def _validate_configuration(self) -> None:
         if not self._access_token:
             raise MapboxDirectionsConfigurationError(
@@ -84,13 +113,26 @@ class MapboxDirectionsClient:
         destination_longitude: float,
         destination_latitude: float,
     ) -> str:
-        coordinates = ";".join(
+        return self.directions_url_for_coordinates(
             (
-                f"{self._format_coordinate(origin_longitude)},{self._format_coordinate(origin_latitude)}",
-                f"{self._format_coordinate(destination_longitude)},{self._format_coordinate(destination_latitude)}",
+                (origin_longitude, origin_latitude),
+                (destination_longitude, destination_latitude),
             )
         )
-        return f"{self.base_url}/{self.profile}/{coordinates}"
+
+    def directions_url_for_coordinates(
+        self,
+        coordinates: Sequence[tuple[float, float]],
+    ) -> str:
+        """Build one Directions URL for origin, optional waypoints, destination."""
+
+        validated = self._validated_coordinates(coordinates)
+        coordinate_path = ";".join(
+            f"{self._format_coordinate(longitude)},"
+            f"{self._format_coordinate(latitude)}"
+            for longitude, latitude in validated
+        )
+        return f"{self.base_url}/{self.profile}/{coordinate_path}"
 
     def fetch_directions(
         self,
@@ -100,16 +142,26 @@ class MapboxDirectionsClient:
         destination_longitude: float,
         destination_latitude: float,
     ) -> Mapping[str, Any]:
-        self._validate_configuration()
-        url = self.directions_url(
-            origin_longitude=origin_longitude,
-            origin_latitude=origin_latitude,
-            destination_longitude=destination_longitude,
-            destination_latitude=destination_latitude,
+        return self.fetch_directions_for_coordinates(
+            (
+                (origin_longitude, origin_latitude),
+                (destination_longitude, destination_latitude),
+            )
         )
+
+    def fetch_directions_for_coordinates(
+        self,
+        coordinates: Sequence[tuple[float, float]],
+        *,
+        alternatives: bool = True,
+    ) -> Mapping[str, Any]:
+        """Fetch walking routes for a validated coordinate sequence."""
+
+        self._validate_configuration()
+        url = self.directions_url_for_coordinates(coordinates)
         parameters = {
             "access_token": self._access_token,
-            "alternatives": "true",
+            "alternatives": "true" if alternatives else "false",
             "geometries": "geojson",
             "overview": "full",
             "steps": "true",
