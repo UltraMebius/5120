@@ -4,7 +4,15 @@ from functools import lru_cache
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from ..db.exceptions import CalmWayDatabaseError
 from ..models.crowd import CrowdPreference
+from ..schemas.route_options import (
+    ComparisonPedestrianFlowResponse,
+    PedestrianFlowEvidenceResponse,
+    RouteOptionResponse,
+    RouteOptionsRequest,
+    RouteOptionsResponse,
+)
 from ..schemas.routes import (
     InitialCrowdAlert,
     WalkingRouteOption,
@@ -23,6 +31,14 @@ from ..services.routing.mapbox_directions_client import (
 from ..services.routing.route_crowd_ranking_service import (
     RankedRouteCrowdResult,
     RouteCrowdRankingService,
+)
+from ..services.routing.multi_route_candidate_service import (
+    MultiRouteCandidateService,
+)
+from ..services.routing.route_option_selection_service import (
+    RouteOptionSelectionError,
+    RouteOptionSelectionResult,
+    RouteOptionSelectionService,
 )
 from ..services.routing.routing_service import (
     WalkingRouteUnavailableError,
@@ -52,6 +68,20 @@ def get_route_crowd_alert_service() -> RouteCrowdAlertService:
     """Construct the pure initial route-ahead decision service."""
 
     return RouteCrowdAlertService()
+
+
+@lru_cache
+def get_multi_route_candidate_service() -> MultiRouteCandidateService:
+    """Construct the additive candidate pipeline lazily."""
+
+    return MultiRouteCandidateService()
+
+
+@lru_cache
+def get_route_option_selection_service() -> RouteOptionSelectionService:
+    """Construct the pure Phase 3 product-role selector."""
+
+    return RouteOptionSelectionService()
 
 
 def _public_initial_alert(
@@ -117,6 +147,83 @@ def _enriched_route(
     )
 
 
+def _public_route_options(
+    selection: RouteOptionSelectionResult,
+) -> RouteOptionsResponse:
+    routes: list[RouteOptionResponse] = []
+    for selected in selection.routes:
+        candidate = selected.candidate
+        summary = candidate.pedestrian_flow_summary
+        if summary is None:
+            raise RouteOptionSelectionError(
+                "route option is missing its pedestrian-flow summary"
+            )
+        comparison = selected.comparison_pedestrian_flow
+        routes.append(
+            RouteOptionResponse(
+                routeId=candidate.route_id,
+                routeIndex=candidate.source_index,
+                candidateSource=candidate.candidate_source,
+                geometry=candidate.geometry,
+                distanceMeters=candidate.distance_meters,
+                durationSeconds=candidate.duration_seconds,
+                steps=list(candidate.steps),
+                roleBadges=list(selected.role_badges),
+                relativePedestrianActivity=(
+                    selected.relative_pedestrian_activity
+                ),
+                typicalPedestrianMovementsPerMinute=(
+                    comparison.typical_movements_per_minute
+                ),
+                comparisonPedestrianFlow=ComparisonPedestrianFlowResponse(
+                    basis=comparison.basis,
+                    typicalMovementsPerMinute=(
+                        comparison.typical_movements_per_minute
+                    ),
+                    p75MovementsPerMinute=(
+                        comparison.p75_movements_per_minute
+                    ),
+                    maximumMovementsPerMinute=(
+                        comparison.maximum_movements_per_minute
+                    ),
+                    coveragePct=comparison.coverage_pct,
+                ),
+                livePedestrianFlow=PedestrianFlowEvidenceResponse(
+                    medianMovementsPerMinute=(
+                        summary.live_median_pedestrian_movements_per_minute
+                    ),
+                    p75MovementsPerMinute=(
+                        summary.live_p75_pedestrian_movements_per_minute
+                    ),
+                    maximumMovementsPerMinute=(
+                        summary.live_maximum_pedestrian_movements_per_minute
+                    ),
+                    coveragePct=summary.live_coverage_pct,
+                ),
+                historicalPedestrianFlow=PedestrianFlowEvidenceResponse(
+                    medianMovementsPerMinute=(
+                        summary
+                        .historical_median_pedestrian_movements_per_minute
+                    ),
+                    p75MovementsPerMinute=(
+                        summary.historical_p75_pedestrian_movements_per_minute
+                    ),
+                    maximumMovementsPerMinute=(
+                        summary
+                        .historical_maximum_pedestrian_movements_per_minute
+                    ),
+                    coveragePct=summary.historical_coverage_pct,
+                ),
+                balancedScore=selected.balanced_score,
+            )
+        )
+    return RouteOptionsResponse(
+        comparisonBasis=selection.comparison_basis,
+        generationReason=selection.generation_reason,
+        routes=routes,
+    )
+
+
 @router.post("/routes/walking", response_model=WalkingRoutesResponse)
 def list_walking_routes(
     request: WalkingRouteRequest,
@@ -167,3 +274,56 @@ def list_walking_routes(
         recommendedRouteId=ranking.recommended_route_id,
         rankingStatus=ranking.ranking_status,
     )
+
+
+@router.post("/routes/options", response_model=RouteOptionsResponse)
+def list_route_options(
+    request: RouteOptionsRequest,
+    candidate_service: MultiRouteCandidateService = Depends(
+        get_multi_route_candidate_service
+    ),
+    selection_service: RouteOptionSelectionService = Depends(
+        get_route_option_selection_service
+    ),
+) -> RouteOptionsResponse:
+    """Generate candidates once, then assign product roles in memory."""
+
+    try:
+        candidates = candidate_service.generate_candidates(
+            origin_longitude=request.origin.longitude,
+            origin_latitude=request.origin.latitude,
+            destination_longitude=request.destination.longitude,
+            destination_latitude=request.destination.latitude,
+        )
+        selection = selection_service.select_options(candidates)
+        return _public_route_options(selection)
+    except MapboxDirectionsConfigurationError:
+        raise HTTPException(
+            status_code=503,
+            detail="Walking routing is not configured.",
+        ) from None
+    except (MapboxDirectionsConnectionError, MapboxDirectionsResponseError):
+        raise HTTPException(
+            status_code=502,
+            detail="Walking routing service is unavailable.",
+        ) from None
+    except WalkingRouteUnavailableError:
+        raise HTTPException(
+            status_code=502,
+            detail="Walking routes are currently unavailable.",
+        ) from None
+    except CalmWayDatabaseError:
+        raise HTTPException(
+            status_code=503,
+            detail="Pedestrian-flow data is currently unavailable.",
+        ) from None
+    except (RouteOptionSelectionError, ValueError):
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to generate walking route options.",
+        ) from None
+    except RuntimeError:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to generate walking route options.",
+        ) from None
