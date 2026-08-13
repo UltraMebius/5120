@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import AppHeader from "../components/layout/AppHeader";
-import MapboxMap from "../components/map/MapboxMap";
 import RouteSearchForm from "../components/route/RouteSearchForm";
 import { useJourney } from "../context/JourneyContext";
 import { fetchRouteOptions, RouteOptionsApiError } from "../services/api";
@@ -36,25 +35,33 @@ function RouteSearchPage() {
   }
 
   return (
-    <div className="page-frame page-frame--soft">
+    <div className="page-frame page-frame--soft route-search-page">
       <AppHeader />
-      <main className="content-shell content-shell--search">
+      <main className="content-shell content-shell--search search-shell">
         <section className="search-intro">
-          <p className="eyebrow">Melbourne CBD · Walking</p>
+          <p className="eyebrow">Plan your walk</p>
           <h1>Find a calmer way there</h1>
           <p>
-            Choose where you&apos;re starting and going, then compare walking
-            routes using pedestrian activity estimates.
+            Choose a starting point and destination to compare walking routes.
           </p>
         </section>
 
         {error && (
           <p className="error-message" role="alert">
-            {error}
+            We couldn&apos;t find walking routes for those locations. Please try
+            again.
           </p>
         )}
 
-        <MapboxMap />
+        {isLoading && (
+          <div className="route-loading-status" role="status">
+            <span className="route-loading-status__spinner" aria-hidden="true" />
+            <span>
+              <strong>Finding walking routes...</strong>
+              <small>Comparing available walking options</small>
+            </span>
+          </div>
+        )}
 
         <RouteSearchForm
           initialDestination={journey.destination}

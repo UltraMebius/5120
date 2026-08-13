@@ -186,7 +186,7 @@ function RouteSearchForm({
         <LocationSearchField
           error={locationError ?? errors.origin}
           id="origin"
-          label="Starting point"
+          label="From"
           labelAction={
             <button
               className="text-button"
@@ -195,7 +195,6 @@ function RouteSearchForm({
               onClick={() => void useCurrentLocation()}
               type="button"
             >
-              <span aria-hidden="true">◎</span>{" "}
               {isLocating ? "Locating..." : "Use my location"}
             </button>
           }
@@ -210,7 +209,7 @@ function RouteSearchForm({
         <LocationSearchField
           error={errors.destination}
           id="destination"
-          label="Destination"
+          label="To"
           onSelect={selectDestination}
           onTextChange={changeDestinationText}
           placeholder="Search for a Melbourne place or address"
@@ -219,13 +218,8 @@ function RouteSearchForm({
         />
       </div>
 
-      <p className="integration-note">
-        Use your current location or choose a starting point and destination.
-      </p>
-
       <p className="crowd-disclaimer">
-        Pedestrian activity is an estimate and should not be treated as a
-        medical recommendation or safety guarantee.
+        Pedestrian activity is an estimate based on nearby sensors.
       </p>
 
       <button
@@ -233,7 +227,9 @@ function RouteSearchForm({
         disabled={isLoading || isLocating}
         type="submit"
       >
-        {isLoading ? "Finding walking routes..." : "Find walking routes"}
+        {isLoading
+          ? "Finding walking routes..."
+          : "Find sensory-friendly routes"}
         <span aria-hidden="true">→</span>
       </button>
     </form>

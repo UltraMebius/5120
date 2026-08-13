@@ -87,17 +87,38 @@ describe("RouteSearchPage", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it.each([
-    [502, "Walking routes are currently unavailable. Please try again."],
-    [503, "Unable to load route options right now. Please try again."],
-  ])("shows a safe message for HTTP %i and remains on Search", async (status, message) => {
+  it.each([502, 503])(
+    "shows a safe message for HTTP %i and remains on Search",
+    async (status) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn<typeof fetch>().mockResolvedValue(
+          new Response("{}", {
+            headers: { "Content-Type": "application/json" },
+            status,
+          }),
+        ),
+      );
+      renderSearchPage();
+
+      await userEvent.click(
+        screen.getByRole("button", { name: "Submit mocked search" }),
+      );
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "We couldn't find walking routes for those locations. Please try again.",
+      );
+      expect(
+        screen.getByRole("button", { name: "Submit mocked search" }),
+      ).toBeInTheDocument();
+    },
+  );
+
+  it("shows a concise loading state and disables repeat submission", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn<typeof fetch>().mockResolvedValue(
-        new Response("{}", {
-          headers: { "Content-Type": "application/json" },
-          status,
-        }),
+      vi.fn<typeof fetch>().mockReturnValue(
+        new Promise<Response>(() => undefined),
       ),
     );
     renderSearchPage();
@@ -106,9 +127,11 @@ describe("RouteSearchPage", () => {
       screen.getByRole("button", { name: "Submit mocked search" }),
     );
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(message);
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Finding walking routes...",
+    );
     expect(
-      screen.getByRole("button", { name: "Submit mocked search" }),
-    ).toBeInTheDocument();
+      screen.getByRole("button", { name: "Finding walking routes..." }),
+    ).toBeDisabled();
   });
 });

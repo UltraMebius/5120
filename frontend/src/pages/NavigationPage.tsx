@@ -8,6 +8,10 @@ import {
   formatWalkingDistance,
   formatWalkingDuration,
 } from "../utils/formatRoute";
+import {
+  formatPedestrianActivity,
+  pedestrianActivityLabel,
+} from "../utils/routeOptionPresentation";
 
 function NavigationPage() {
   const navigate = useNavigate();
@@ -28,6 +32,7 @@ function NavigationPage() {
   const nextStep = route.steps.find((step) => step.instruction.trim());
   const instruction =
     nextStep?.instruction.trim() || "Continue along the selected route";
+  const routeRole = route.roleBadges.join(" + ") || "Selected route";
 
   function exitJourney() {
     setIsExiting(true);
@@ -44,19 +49,20 @@ function NavigationPage() {
           onClick={() => navigate("/routes/options")}
           type="button"
         >
-          ←
+          &larr;
         </button>
         <div>
-          <span>Walking to</span>
+          <span>Route guidance</span>
           <strong>{mapDestination.label}</strong>
         </div>
-        <span className="navigation-header__mode" aria-label="Walking route">
+        <span className="navigation-header__mode" aria-label="Walking mode">
           Walk
         </span>
       </header>
 
       <main className="navigation-main">
         <RouteMap
+          activeRouteId={route.routeId}
           destination={mapDestination}
           origin={journey.origin}
           routes={[route]}
@@ -65,29 +71,44 @@ function NavigationPage() {
 
         <section className="maneuver-card" aria-label="Next walking direction">
           <div className="maneuver-card__arrow" aria-hidden="true">
-            →
+            &rarr;
           </div>
           <div>
-            {nextStep && <span>In {Math.round(nextStep.distanceMeters)} m</span>}
+            <span>Next route instruction</span>
             <h1>{instruction}</h1>
           </div>
         </section>
 
-        <section className="navigation-status">
+        <section className="navigation-status" aria-label="Route summary">
           <div className="navigation-status__summary">
             <div>
               <strong>{formatWalkingDuration(route.durationSeconds)}</strong>
-              <span>estimated</span>
+              <span>estimated time</span>
             </div>
             <div>
               <strong>{formatWalkingDistance(route.distanceMeters)}</strong>
               <span>route distance</span>
             </div>
+            <div>
+              <strong>{routeRole}</strong>
+              <span>selected option</span>
+            </div>
+            <div>
+              <strong>
+                {formatPedestrianActivity(
+                  route.typicalPedestrianMovementsPerMinute,
+                  route.comparisonPedestrianFlow.basis,
+                )}
+              </strong>
+              <span>
+                {pedestrianActivityLabel(route.relativePedestrianActivity)}
+              </span>
+            </div>
           </div>
 
           <p className="navigation-limit-note">
-            Route guidance overview. Live location and turn-by-turn progress are
-            not enabled.
+            Follow the backend-provided route instructions. Live position and
+            turn-by-turn tracking are not enabled.
           </p>
 
           <div className="navigation-overview-actions">
@@ -96,14 +117,14 @@ function NavigationPage() {
               onClick={exitJourney}
               type="button"
             >
-              Exit
+              Exit navigation
             </button>
             <button
               className="button button--primary"
               onClick={() => navigate("/arrival")}
               type="button"
             >
-              End route overview
+              Finish route
             </button>
           </div>
         </section>

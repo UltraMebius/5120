@@ -3,10 +3,6 @@ import { Navigate, useNavigate } from "react-router-dom";
 
 import { APP_CONFIG } from "../config";
 import { useJourney } from "../context/JourneyContext";
-import {
-  formatWalkingDistance,
-  formatWalkingDuration,
-} from "../utils/formatRoute";
 
 function ArrivalPage() {
   const navigate = useNavigate();
@@ -22,7 +18,7 @@ function ArrivalPage() {
     return null;
   }
 
-  function endNavigation() {
+  function planAnotherWalk() {
     setIsEnding(true);
     journey.resetJourney();
     navigate(APP_CONFIG.homeRoute, { replace: true });
@@ -32,40 +28,22 @@ function ArrivalPage() {
     <main className="arrival-page">
       <section className="arrival-card">
         <div className="arrival-card__mark" aria-hidden="true">
-          ✓
+          &#10003;
         </div>
-        <p className="eyebrow">Planned journey</p>
-        <h1>Route summary</h1>
+        <p className="eyebrow">Journey complete</p>
+        <h1>You&apos;ve arrived</h1>
         <p className="arrival-card__destination">
           {journey.destination.label}
         </p>
-
-        <div className="arrival-stats">
-          <div>
-            <span>Planned distance</span>
-            <strong>{formatWalkingDistance(route.distanceMeters)}</strong>
-          </div>
-          <div>
-            <span>Estimated time</span>
-            <strong>{formatWalkingDuration(route.durationSeconds)}</strong>
-          </div>
-          <div>
-            <span>Route roles</span>
-            <strong>{route.roleBadges.join(" + ")}</strong>
-          </div>
-        </div>
-
         <p className="arrival-note">
-          This summary reflects the planned route. Live route progress and
-          actual journey time were not tracked.
+          We hope this route helped make your walk feel a little calmer.
         </p>
-
         <button
           className="button button--primary button--large button--full"
-          onClick={endNavigation}
+          onClick={planAnotherWalk}
           type="button"
         >
-          End navigation
+          Plan another walk
         </button>
       </section>
     </main>

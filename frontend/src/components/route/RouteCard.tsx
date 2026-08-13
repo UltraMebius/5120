@@ -11,79 +11,79 @@ import {
 
 interface RouteCardProps {
   comparisonBasis: ComparisonBasis;
+  isSelected: boolean;
+  onActivate: (route: RouteOption) => void;
   optionNumber: number;
-  onSelect: (route: RouteOption) => void;
+  panelId: string;
   route: RouteOption;
+}
+
+function routeLabel(route: RouteOption, optionNumber: number): string {
+  return route.roleBadges.length > 0
+    ? route.roleBadges.join(" + ")
+    : `Route ${optionNumber}`;
 }
 
 function RouteCard({
   comparisonBasis,
+  isSelected,
+  onActivate,
   optionNumber,
-  onSelect,
+  panelId,
   route,
 }: RouteCardProps) {
-  return (
-    <article className="route-card">
-      <div className="route-card__topline">
-        <div>
-          <span className="route-source-label">Walking route</span>
-          <h2>Option {optionNumber}</h2>
-        </div>
-        <div aria-label="Route roles" className="route-role-badges">
-          {route.roleBadges.map((role) => (
-            <span className="route-role-badge" key={role}>
-              {role}
-            </span>
-          ))}
-        </div>
-      </div>
+  const label = routeLabel(route, optionNumber);
+  const activity = route.relativePedestrianActivity.toLowerCase();
 
-      <div className="route-card__crowd-analysis">
-        <span>
-          <strong>
+  return (
+    <article
+      className={`route-card route-card--activity-${activity}${
+        isSelected ? " route-card--selected" : ""
+      }`}
+      data-activity={route.relativePedestrianActivity}
+    >
+      <button
+        aria-controls={panelId}
+        aria-selected={isSelected}
+        className="route-card__selector"
+        id={`route-tab-${route.routeId}`}
+        onClick={() => onActivate(route)}
+        role="tab"
+        type="button"
+      >
+        <span className="route-card__topline">
+          <span className="route-role-badges" aria-label="Route roles">
+            {route.roleBadges.length > 0 ? (
+              route.roleBadges.map((role) => (
+                <span className="route-role-badge" key={role}>
+                  {role}
+                </span>
+              ))
+            ) : (
+              <span className="route-rank-label">Route {optionNumber}</span>
+            )}
+          </span>
+          <span className="route-card__metric">
             {formatPedestrianActivity(
               route.typicalPedestrianMovementsPerMinute,
               comparisonBasis,
             )}
-          </strong>
-          <small>
-            {pedestrianActivityLabel(route.relativePedestrianActivity)}
-          </small>
-          <small>{pedestrianSourceLabel(comparisonBasis)}</small>
+          </span>
         </span>
-      </div>
 
-      <div className="route-card__stats">
-        <div>
-          <span className="route-stat__icon" aria-hidden="true">
-            ↔
-          </span>
-          <span>
-            <strong>{formatWalkingDistance(route.distanceMeters)}</strong>
-            <small>Walking distance</small>
-          </span>
-        </div>
-        <div>
-          <span className="route-stat__icon" aria-hidden="true">
-            ◷
-          </span>
-          <span>
-            <strong>{formatWalkingDuration(route.durationSeconds)}</strong>
-            <small>Estimated walking time</small>
-          </span>
-        </div>
-      </div>
-
-      <div className="route-card__actions route-card__actions--single">
-        <button
-          className="button button--primary"
-          onClick={() => onSelect(route)}
-          type="button"
-        >
-          Select route
-          <span aria-hidden="true">→</span>
-        </button>
-      </div>
+        <span className="route-card__secondary">
+          <span>{formatWalkingDuration(route.durationSeconds)}</span>
+          <span aria-hidden="true">·</span>
+          <span>{formatWalkingDistance(route.distanceMeters)}</span>
+        </span>
+        <span className="route-card__activity">
+          {pedestrianActivityLabel(route.relativePedestrianActivity)}
+        </span>
+        <span className="route-card__source">
+          {pedestrianSourceLabel(comparisonBasis)}
+        </span>
+        <span className="visually-hidden">Select {label} details</span>
+      </button>
     </article>
   );
 }

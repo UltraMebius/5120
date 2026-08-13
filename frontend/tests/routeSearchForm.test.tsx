@@ -26,7 +26,7 @@ describe("RouteSearchForm", () => {
     const onSearch = renderForm();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /find walking routes/i }),
+      screen.getByRole("button", { name: /find sensory-friendly routes/i }),
     );
 
     expect(screen.getByText("Origin is required.")).toBeInTheDocument();
@@ -34,6 +34,8 @@ describe("RouteSearchForm", () => {
     expect(screen.queryByText(/crowd tolerance/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("radio")).not.toBeInTheDocument();
     expect(screen.queryByText(/^LOW$|^MEDIUM$|^HIGH$/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText("From")).toBeInTheDocument();
+    expect(screen.getByLabelText("To")).toBeInTheDocument();
     expect(onSearch).not.toHaveBeenCalled();
   });
 
@@ -44,7 +46,7 @@ describe("RouteSearchForm", () => {
     });
 
     fireEvent.click(
-      screen.getByRole("button", { name: /find walking routes/i }),
+      screen.getByRole("button", { name: /find sensory-friendly routes/i }),
     );
 
     expect(onSearch).toHaveBeenCalledTimes(1);
@@ -64,7 +66,7 @@ describe("RouteSearchForm", () => {
       onSearch,
     });
     const form = screen
-      .getByRole("button", { name: /find walking routes/i })
+      .getByRole("button", { name: /find sensory-friendly routes/i })
       .closest("form");
     expect(form).not.toBeNull();
 

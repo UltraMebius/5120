@@ -20,6 +20,7 @@ type RouteMapVariant = "navigation" | "options";
 type RouteCoordinate = [longitude: number, latitude: number];
 
 interface RouteMapProps {
+  activeRouteId?: string;
   destination: MapboxJourneyLocation | null;
   origin: JourneyLocation | null;
   routes: RouteOption[];
@@ -30,7 +31,9 @@ interface RouteFeature {
   geometry: GeoJsonLineString;
   properties: {
     colour: string;
+    isActive: number;
     routeId: string;
+    sortOrder: number;
   };
   type: "Feature";
 }
@@ -68,6 +71,7 @@ export function createRouteMapVisualisation(
   origin: JourneyLocation | null,
   destination: MapboxJourneyLocation | null,
   routes: RouteOption[],
+  activeRouteId?: string,
 ): RouteVisualisation | null {
   const originCoordinate: unknown = origin
     ? [origin.longitude, origin.latitude]
@@ -90,11 +94,13 @@ export function createRouteMapVisualisation(
     return null;
   }
 
-  const features = routes.map<RouteFeature>((route) => ({
+  const features = routes.map<RouteFeature>((route, index) => ({
     geometry: route.geometry,
     properties: {
       colour: ROUTE_ACTIVITY_COLOURS[route.relativePedestrianActivity],
+      isActive: route.routeId === activeRouteId ? 1 : 0,
       routeId: route.routeId,
+      sortOrder: index + (route.routeId === activeRouteId ? 100 : 0),
     },
     type: "Feature",
   }));
@@ -134,7 +140,13 @@ function createMarkerElement(
   return element;
 }
 
-function RouteMap({ destination, origin, routes, variant }: RouteMapProps) {
+function RouteMap({
+  activeRouteId,
+  destination,
+  origin,
+  routes,
+  variant,
+}: RouteMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const originMarkerRef = useRef<mapboxgl.Marker | null>(null);
@@ -145,8 +157,14 @@ function RouteMap({ destination, origin, routes, variant }: RouteMapProps) {
   const [styleRevision, setStyleRevision] = useState(0);
   const configured = isMapboxConfigured();
   const visualisation = useMemo(
-    () => createRouteMapVisualisation(origin, destination, routes),
-    [destination, origin, routes],
+    () =>
+      createRouteMapVisualisation(
+        origin,
+        destination,
+        routes,
+        activeRouteId,
+      ),
+    [activeRouteId, destination, origin, routes],
   );
 
   useEffect(() => {
@@ -230,18 +248,24 @@ function RouteMap({ destination, origin, routes, variant }: RouteMapProps) {
           layout: {
             "line-cap": "round",
             "line-join": "round",
+            "line-sort-key": ["get", "sortOrder"],
           },
           paint: {
             "line-color": ["get", "colour"],
-            "line-opacity": 0.94,
+            "line-opacity": [
+              "case",
+              ["==", ["get", "isActive"], 1],
+              1,
+              0.78,
+            ],
             "line-width": [
               "interpolate",
               ["linear"],
               ["zoom"],
               10,
-              4,
+              ["case", ["==", ["get", "isActive"], 1], 6, 4],
               16,
-              8,
+              ["case", ["==", ["get", "isActive"], 1], 10, 7],
             ],
           },
           source: ROUTE_SOURCE_ID,
@@ -297,8 +321,8 @@ function RouteMap({ destination, origin, routes, variant }: RouteMapProps) {
         const padding =
           variant === "navigation"
             ? containerWidth < 640
-              ? { bottom: 230, left: 42, right: 42, top: 185 }
-              : { bottom: 260, left: 80, right: 80, top: 200 }
+              ? { bottom: 160, left: 34, right: 34, top: 125 }
+              : { bottom: 175, left: 64, right: 64, top: 140 }
             : containerWidth < 640
               ? 42
               : 58;

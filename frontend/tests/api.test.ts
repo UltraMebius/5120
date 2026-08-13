@@ -65,7 +65,9 @@ describe("fetchRouteOptions", () => {
 
       expect(result.comparisonBasis).toBe(comparisonBasis);
       expect(result.routes).toHaveLength(routeCount);
-      expect(result.routes[0].roleBadges).toEqual(["CALMEST", "FASTEST"]);
+      expect(result.routes[0].roleBadges).toEqual(
+        response.routes[0].roleBadges,
+      );
       expect(result.routes[0].geometry).toEqual(response.routes[0].geometry);
     },
   );

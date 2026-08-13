@@ -2,27 +2,6 @@ import { Link } from "react-router-dom";
 
 import { APP_CONFIG } from "../config";
 
-const HOME_FEATURES = [
-  {
-    marker: "01",
-    title: "Calmer route choices",
-    description:
-      "Compare walking routes using pedestrian activity estimates.",
-  },
-  {
-    marker: "02",
-    title: "Crowd-aware preferences",
-    description:
-      "Choose the crowd tolerance that feels right for your journey.",
-  },
-  {
-    marker: "03",
-    title: "Route-ahead crowd alerts",
-    description:
-      "See when available pedestrian data indicates busier activity ahead.",
-  },
-] as const;
-
 function HomePage() {
   return (
     <main className="home-page">
@@ -42,15 +21,20 @@ function HomePage() {
       <div className="home-shell">
         <section className="home-hero" aria-labelledby="home-title">
           <div className="home-hero__copy">
-            <p className="home-kicker">Calmer walking in Melbourne</p>
-            <h1 id="home-title">
-              Navigate Melbourne
-              <span>with less stress</span>
-            </h1>
+            <p className="home-kicker">Sensory-friendly walking</p>
+            <h1 id="home-title">Find a calmer way through Melbourne</h1>
             <p className="home-hero__description">
-              CalmWay helps sensory-sensitive travellers compare walking
-              routes using pedestrian activity estimates and choose a crowd
-              tolerance that suits their journey.
+              Compare walking routes using recent pedestrian sensor data.
+            </p>
+            <Link
+              className="button button--primary button--large home-primary-action"
+              to="/routes/search"
+            >
+              Find a Sensory-Friendly Route
+              <span aria-hidden="true">&rarr;</span>
+            </Link>
+            <p className="home-hero__support">
+              Compare calmer, faster and balanced walking options.
             </p>
           </div>
 
@@ -90,39 +74,25 @@ function HomePage() {
               </g>
             </svg>
             <span className="home-route-illustration__label">
-              A calmer route starts with your preference
+              Recent pedestrian estimates help compare each route.
             </span>
           </div>
         </section>
 
-        <section
-          className="home-capabilities"
-          aria-labelledby="home-capabilities-title"
-        >
-          <div className="home-capabilities__heading">
-            <p className="home-kicker">Designed around your journey</p>
-            <h2 id="home-capabilities-title">What CalmWay helps you do</h2>
-          </div>
-
-          <div className="home-feature-grid">
-            {HOME_FEATURES.map((feature) => (
-              <article className="home-feature-card" key={feature.title}>
-                <span className="home-feature-card__marker" aria-hidden="true">
-                  {feature.marker}
-                </span>
-                <h3>{feature.title}</h3>
-                <p>{feature.description}</p>
-              </article>
-            ))}
-          </div>
-
-          <Link
-            className="button button--primary button--large home-primary-action"
-            to="/routes/search"
-          >
-            Find a Sensory-Friendly Route
-          </Link>
-        </section>
+        <ul className="home-benefits" aria-label="Route comparison features">
+          <li>
+            <strong>Calmer</strong>
+            <span>Lower pedestrian activity</span>
+          </li>
+          <li>
+            <strong>Faster</strong>
+            <span>Shortest walking time</span>
+          </li>
+          <li>
+            <strong>Balanced</strong>
+            <span>Time and activity together</span>
+          </li>
+        </ul>
       </div>
     </main>
   );

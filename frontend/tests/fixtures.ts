@@ -30,11 +30,13 @@ export function makeRouteOption(
   index: number,
   comparisonBasis: ComparisonBasis = "LIVE",
 ): RouteOption {
-  const typical = comparisonBasis === "UNKNOWN" ? null : 18 + index * 12;
+  const typicalValues = [8, 11, 15] as const;
+  const typical =
+    comparisonBasis === "UNKNOWN" ? null : (typicalValues[index] ?? 11);
   const relativeActivities = ["LOWEST", "MIDDLE", "HIGHEST"] as const;
   const roleBadges: RouteOption["roleBadges"] =
     index === 0
-      ? ["CALMEST", "FASTEST"]
+      ? ["CALMEST"]
       : index === 1
         ? ["BALANCED"]
         : ["FASTEST"];
@@ -106,6 +108,14 @@ export function makeRouteOptionsResponse(
   routeCount: 1 | 2 | 3,
   comparisonBasis: ComparisonBasis = "LIVE",
 ): RouteOptionsResponse {
+  const routes = Array.from({ length: routeCount }, (_, index) =>
+    makeRouteOption(index, comparisonBasis),
+  );
+
+  if (routeCount === 2 && comparisonBasis !== "UNKNOWN") {
+    routes[1].relativePedestrianActivity = "HIGHEST";
+  }
+
   return {
     comparisonBasis,
     generationReason:
@@ -114,8 +124,6 @@ export function makeRouteOptionsResponse(
         : routeCount === 2
           ? "MULTIPLE_MAPBOX_ROUTES"
           : "WAYPOINT_ALTERNATIVE_ADDED",
-    routes: Array.from({ length: routeCount }, (_, index) =>
-      makeRouteOption(index, comparisonBasis),
-    ),
+    routes,
   };
 }

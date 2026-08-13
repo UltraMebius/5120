@@ -29,11 +29,11 @@ export function pedestrianActivityLabel(
 ): string {
   switch (activity) {
     case "LOWEST":
-      return "Lowest relative pedestrian activity";
+      return "Lowest pedestrian activity";
     case "MIDDLE":
-      return "Middle relative pedestrian activity";
+      return "Middle pedestrian activity";
     case "HIGHEST":
-      return "Highest relative pedestrian activity";
+      return "Highest pedestrian activity";
     case "UNKNOWN":
       return "Relative pedestrian activity unavailable";
   }
@@ -42,7 +42,7 @@ export function pedestrianActivityLabel(
 export function pedestrianSourceLabel(basis: ComparisonBasis): string {
   switch (basis) {
     case "LIVE":
-      return "Live sensor estimate";
+      return "Recent sensor estimate";
     case "HISTORICAL_ESTIMATE":
       return "Historical estimate";
     case "UNKNOWN":
