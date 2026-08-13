@@ -1,18 +1,26 @@
-# Data folders
+# Data staging directories
 
-No City of Melbourne dataset is ingested or bundled in Phase 1.
-
-The confirmed dataset IDs, data states, natural keys, historical contexts, and
-processing rules are documented in `handoff/epic1_backend_handoff_v3/`. The
-final application stores source and derived data in PostgreSQL/PostGIS rather
-than treating `data/processed/` files as the production database.
+CalmWay does not bundle City of Melbourne downloads or production database
+exports in Git. Runtime and reproducible application data are stored in
+PostgreSQL/PostGIS using the schema under
+`handoff/epic1_backend_handoff_v3/05_DATABASE_SCHEMA.sql`.
 
 ## `data/raw/`
 
-Reserved only for controlled local Data Science exploration. Preserve original
-source files and document provenance; do not commit secrets or large downloads.
+Reserved for controlled local source downloads or data-science exploration.
+Preserve source provenance and licensing notes alongside any local file. Do not
+commit credentials, large downloads, database dumps, or temporary API payloads.
 
 ## `data/processed/`
 
-Reserved for reproducible validation outputs or exchange artifacts. Backend
-request-time services must ultimately use the authoritative PostGIS schema.
+Reserved for reproducible local validation outputs or reviewed exchange
+artifacts. A processed file must not replace the authoritative PostGIS tables
+used by request-time services.
+
+Both directories intentionally contain tracked `.gitkeep` placeholders. No
+data file was removed during the final cleanup because no obsolete or duplicate
+payload was present.
+
+Use `scripts/` for ingestion and evaluation. Current data flow and safety rules
+are documented in `README.md`, `docs/architecture.md`,
+`docs/testing-guide.md`, and `docs/team-guide.md`.

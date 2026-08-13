@@ -1,225 +1,450 @@
 # CalmWay
 
-CalmWay is a responsive walking-route web application for sensory-sensitive
-commuters in Melbourne CBD. The project has completed **Epic 1 Phase 6B final
-acceptance** and integrated the teammate-owned Home experience. The
-frontend can use a one-shot browser geolocation or search for a real Mapbox
-starting point, request real walking candidates from the FastAPI backend,
-preview each returned LineString on Mapbox GL JS, and reuse the selected route
-on the static Navigation screen. The backend measures
-and uniformly samples those LineStrings at the configured interval, evaluates
-each sample with the Phase 2D crowd point engine, then applies the project-
-approved coverage, P75, preference, and deterministic ranking policy.
-The same per-route evaluation now also produces an initial route-ahead decision
-at 0 m, which Navigation presents without claiming live GPS progress. An alert
-may offer a strictly eligible route already present in the original response.
-The user-facing flow has also been cleaned of development badges, diagnostics,
-provider-specific helper text, and preview terminology while retaining honest
-crowd-data and static-navigation limitations.
+## Overview
 
-## Current Epic 1 flow
+CalmWay is a responsive walking-route application for Melbourne. It helps
+people compare route distance, duration, and pedestrian activity before
+choosing a route. The sensory-aware product goal is broader than the current
+measurement: pedestrian crowd exposure is the only sensory proxy currently
+implemented.
+
+The active React journey searches real Mapbox places, accepts an optional
+one-shot current location, requests one to three backend-generated walking
+options, draws their exact backend geometry, and preserves the selected route
+through static route guidance and arrival.
+
+## Problem Statement
+
+The fastest pedestrian route is not always the most comfortable route for a
+person who is sensitive to crowded environments. Conventional route planners
+usually optimise time and distance without explaining pedestrian activity.
+CalmWay combines walking geometry with City of Melbourne pedestrian sensor
+evidence so users can compare a calmer, faster, or balanced option where the
+available data supports that distinction.
+
+## Target Users
+
+- sensory-sensitive commuters and visitors;
+- people who prefer to avoid heavily used pedestrian corridors;
+- anyone who wants pedestrian activity context alongside time and distance.
+
+CalmWay is an informational university MVP. It is not a medical device,
+accessibility guarantee, personal-safety service, or comprehensive measure of
+sensory conditions.
+
+## UN SDG Alignment
+
+CalmWay supports the intent of UN Sustainable Development Goal 11,
+**Sustainable Cities and Communities**, by exploring more inclusive pedestrian
+mobility and access to urban space. It also has a secondary relationship to
+SDG 3, **Good Health and Well-being**, through informed route choice. These are
+design alignments, not evidence that the MVP has measured population-level SDG
+impact.
+
+## Current Scope
+
+The active frontend flow is:
 
 ```text
-Home
-  -> Route Search
-  -> Route Options
-  -> Active Navigation
-  -> optional Crowd Alert state
-  -> Route summary
-  -> Home
+Home -> Route Search -> Route Options -> Navigation -> Arrival -> Home
 ```
 
-Frontend routes:
+The active frontend calls `POST /api/v1/routes/options`. It presents up to three
+real route candidates with backend-assigned `CALMEST`, `FASTEST`, and
+`BALANCED` roles, typical pedestrian movements per minute, evidence source,
+relative pedestrian activity, duration, distance, and route geometry.
 
-- `/routes/search`
-- `/routes/options`
-- `/navigation`
-- `/arrival`
-- `/home` (or the internal path configured by `VITE_HOME_ROUTE`)
+The repository also retains `POST /api/v1/routes/walking`, a tested backend API
+that performs Low/Medium/High preference-aware Crowd Exposure ranking and
+returns one initial route-ahead alert decision. The active React pages no
+longer call that endpoint and do not currently render a preference selector or
+alert panel. This backend-only boundary is documented rather than presented as
+an end-to-end feature.
 
-The root route redirects to the configured Home route. Home and the journey
-screens share the existing React Router tree, so the primary Home action opens
-Route Search without reloading the page. `VITE_HOME_ROUTE` remains the internal
-Home route integration boundary.
+## User Stories
 
-## Implemented through Phase 6B
+### User Story 1.1
 
-- React Router page structure and a small Journey Context;
-- responsive desktop/mobile UI for the complete Epic 1 flow;
-- Mapbox Search Box place/POI selection with structured coordinates;
-- one-shot browser geolocation as an honest, in-memory structured route origin;
-- single-select LOW/MEDIUM/HIGH crowd preference UI;
-- real Mapbox Directions walking candidates through `POST /api/v1/routes/walking`;
-- route cards supporting the actual returned candidate count;
-- real basemaps, full GeoJSON route lines, endpoint markers, and fitted bounds on
-  Route Options and Navigation;
-- pure, deterministic cumulative-distance route sampling at the configured
-  interval, without Mapbox, crowd, database, or frontend coupling;
-- ordered sample-level crowd evaluation by composing the route sampler directly
-  with the authoritative PostGIS spatial point service;
-- 55% configurable route coverage gating, continuous-interpolation P75 route
-  scoring, soft tolerance comparison, and deterministic backend ranking;
-- honest insufficient-data route cards and backend-owned CalmWay recommendation;
-- a pure, deterministic ahead-of-route `ALERT` / `CLEAR` /
-  `INSUFFICIENT_DATA` decision engine with explicit partial-data diagnostics;
-- initial Navigation alert, clear, and unavailable states using the backend
-  decision at exactly 0 m route progress;
-- route-specific in-memory alert acknowledgement and strict switching to the
-  first eligible, real lower-P75 alternative in existing backend order;
-- final-product Search, Route Options, Navigation, and Route summary wording
-  without user-visible phase badges or development diagnostics;
-- responsive Home integration with a router-native route-search action and
-  truthful summaries of the crowd features already implemented;
-- final acceptance coverage for validation, loading, controlled failures,
-  in-memory route recovery, repeated actions, keyboard use, request boundaries,
-  and desktop/mobile layouts;
-- PostgreSQL/PostGIS ingestion, baselines, current activity, and point-level
-  crowd evaluation from Phases 2A–2D.
+As a sensory-sensitive commuter, I want to compare crowd-exposure information
+for different routes, so that I can choose the route that best matches my
+comfort level.
 
-## Not implemented yet
+Current status: route comparison and explicit route selection are implemented
+end to end. The active UI displays pedestrian movements per minute; the
+preference-aware API exposes percentile-based Crowd Exposure separately.
 
-The application still does **not** perform:
+### User Story 1.2
 
-- continuous GPS navigation, periodic crowd re-evaluation, or rerouting;
-- live progress-driven crowd re-evaluation;
-- deployment.
+As a sensory-sensitive commuter, I want routes with lower crowd exposure to be
+prioritised, so that I can reduce exposure to highly congested pedestrian
+areas.
 
-The Navigation screen is explicitly a static route overview and does not claim
-live user position or route progress.
+Current status: the deterministic preference-aware ranking and recommendation
+are implemented and tested in `/api/v1/routes/walking`, but are not the active
+frontend route contract.
 
-## Crowd algorithm source of truth
+### User Story 1.3
 
-The authoritative backend/data package is
-`handoff/epic1_backend_handoff_v3/`. Phase 1 does not reimplement or simplify
-its algorithm. The frozen contract includes:
+As a sensory-sensitive commuter, I want to receive an alert when crowd exposure
+on the route ahead exceeds my preferred threshold, so that I can make a more
+informed decision before continuing my journey.
 
-- primary Crowd Exposure: current complete 15-minute **Network percentile**;
-- Local Historical Percentile as a separate Local Condition (never `MAX`);
-- backend bands at 25/50/75/90 across five internal levels;
-- `SUPPORTED <=250 m`, `LIMITED >250–300 m`, otherwise `NO_DATA`;
-- normalised inverse-distance weighting `1 / max(distance, 1 m)`;
-- 50 m configurable route sampling and P75 route summary;
-- project-approved MVP route evaluation at 55% numeric coverage;
-- route ranking by No Data %, preference exceedance %, P75 exposure, maximum
-  exposure, duration, then Mapbox route index.
+Current status: the backend initial alert engine is implemented and tested at
+explicit progress `0 m`; alert presentation is not wired into the active React
+Navigation page. See [Acceptance Criteria](docs/acceptance-criteria.md) for the
+criterion-by-criterion status.
 
-`NO_DATA` and `AMBIGUOUS_NO_RECORD` must never be converted to LOW or zero.
-These are relative pedestrian-activity estimates, not persons/m², medical, or
-safety thresholds.
+## Key Features
 
-See [the Simplified Chinese implementation plan](docs/final-epic1-implementation-plan-cn.md)
-for the complete phase plan and scope decisions.
+- Mapbox place/POI suggestions and structured location retrieval;
+- one-shot browser geolocation for the origin, with permission/error handling;
+- backend-only Mapbox walking Directions requests with full GeoJSON and steps;
+- bounded generation of one to three meaningful route candidates;
+- 50 m cumulative-distance route sampling plus exact endpoints;
+- batched PostgreSQL/PostGIS pedestrian-flow evaluation;
+- recent 15-minute sensor estimates with historical typical-flow fallback;
+- deterministic `CALMEST`, `FASTEST`, and `BALANCED` role assignment;
+- honest unavailable states when candidates lack a common evidence basis;
+- map fitting for all options and selected-only Navigation geometry;
+- exact selected-route reuse without a route-options refetch;
+- backend-provided static route guidance and one-screen arrival/reset flow;
+- separate tested P75 preference ranking and initial alert backend contract;
+- authenticated scheduled current-activity refresh.
 
-## Technology
+## System Architecture
 
-- Frontend: React 18, React Router, Vite, TypeScript
-- Backend: Python 3.12, FastAPI, Pydantic
-- Final data architecture: PostgreSQL + PostGIS
-- Map/search/routing provider: Mapbox GL JS, Search Box API, and Directions API
-  with `mapbox/walking`
-- Tests: pytest and FastAPI TestClient
+```text
+React + Vite + TypeScript
+  |-- Mapbox Search Box and Mapbox GL JS (public browser token)
+  |-- POST /api/v1/routes/options
+  v
+FastAPI
+  |-- Mapbox Directions (secret backend token)
+  |-- route candidate generation and distinctness
+  |-- route sampling and pedestrian-flow evaluation
+  |-- route role selection
+  v
+PostgreSQL/PostGIS
+  ^
+  |-- City sensor locations
+  |-- historical hourly counts and baselines
+  |-- current minute observations and materialised activity
+```
 
-Database access uses SQLAlchemy 2.x with psycopg 3. See the
-[Simplified Chinese database development guide](docs/database-development-cn.md)
-for safe Docker lifecycle, configuration, and verification commands. The
-[sensor-location ingestion guide](docs/sensor-location-ingestion-cn.md) documents
-the live source mapping, dry run, transactional import, and spatial checks.
-The [hourly-count ingestion guide](docs/hourly-count-ingestion-cn.md) documents
-the frozen training-window import, zero-count semantics, unknown IDs, and
-idempotency. The [historical baseline guide](docs/historical-baselines-cn.md)
-documents model eligibility, relocation rules, exact statistics, the baseline
-builder, and database verification.
-The [current activity guide](docs/current-activity-cn.md) documents the bounded
-minute source, missing/conflict semantics, exact windows, dual percentiles,
-manual refresh, and SQL verification.
-The [spatial point engine guide](docs/spatial-crowd-engine-cn.md) documents
-PostGIS neighbour discovery, the adopted 250/300 m support rule, normalised
-inverse-distance weighting, point uncertainty, and manual verification.
-The [Mapbox place-search guide](docs/mapbox-search-phase3a-cn.md),
-[walking-directions guide](docs/mapbox-directions-phase3b-cn.md), and
-[route-visualisation guide](docs/mapbox-route-visualization-phase3c-cn.md)
-document the active Phase 3 frontend/backend route flow. The [uniform route
-sampling guide](docs/route-sampling-phase3d-cn.md) documents Phase 3D geometry
-measurement, interpolation, endpoint rules, and offline verification. The
-[route sample crowd evaluation guide](docs/route-sample-crowd-evaluation-phase3e-cn.md)
-documents Phase 3E service composition, coverage/null propagation, controlled
-PostGIS testing, and real current-state verification. The [Phase 4 route-ranking
-decision record](docs/phase4-route-ranking-decisions.md) documents coverage,
-continuous P75, tolerance, deterministic tie-breaks, insufficient-data behavior,
-backend recommendation ownership, and reproduction commands.
-The [Phase 5A geolocation-origin guide](docs/geolocation-origin-phase5a-cn.md)
-documents the one-shot permission flow, source model, privacy boundary, HTTPS
-requirement, and real/simulated browser checks.
-The [Phase 5B-1 decision record](docs/phase5b-crowd-alert-decisions.md) and
-[Simplified Chinese implementation guide](docs/route-crowd-alert-phase5b1-cn.md)
-document the provisional 300 m/two-consecutive-sample heuristic, decision
-semantics, diagnostics, and static-navigation boundary.
-The [Phase 5B-2 Navigation decision record](docs/phase5b2-navigation-alert-decisions.md)
-and [Simplified Chinese Navigation guide](docs/navigation-crowd-alert-phase5b2-cn.md)
-document initial progress, the three UI states, acknowledgement, and the strict
-existing-alternative switch rule.
-The [Phase 6A final UI cleanup guide](docs/final-ui-cleanup-phase6a-cn.md)
-documents the removed development UI, final user wording, unavailable-data and
-static-navigation language, responsive checks, and intentionally unchanged
-technical behavior.
-The [Home integration guide](docs/home-integration-cn.md) documents the
-teammate-source boundary, router integration, truthful Home content, journey
-reset behavior, and responsive verification checklist.
-The [Phase 6B acceptance matrix](docs/phase6b-acceptance-test-matrix-cn.md)
-records historical requirements and new robustness checks without conflating
-them. The [final acceptance guide](docs/final-acceptance-guide-cn.md) provides a
-reusable local checklist and the additional checks required after deployment.
+The frontend never calls Mapbox Directions. Backend route geometry is the
+single geometry source used by the maps. For service boundaries, both route
+contracts, storage, and deployment topology, see
+[Architecture](docs/architecture.md).
 
-Use Node.js 20 or newer for the frontend and Python 3.12 (or another compatible
-modern Python 3 release) for the backend.
+## Technology Stack
 
-## Local setup
+| Layer | Technology |
+| --- | --- |
+| Frontend | React 18, React Router, TypeScript, Vite, Mapbox GL JS |
+| Backend | Python 3.12, FastAPI, Pydantic, httpx |
+| Database | PostgreSQL, PostGIS, SQLAlchemy 2, psycopg 3 |
+| External APIs | Mapbox Search Box, Mapbox Directions v5, City of Melbourne Explore API v2.1 |
+| Testing | pytest, Vitest, Testing Library, jsdom |
+| Deployment | Vercel frontend/backend, Neon PostgreSQL/PostGIS, GitHub Actions refresh |
 
-Create local environment files from `.env.example` as needed. Keep all actual
-`.env` files untracked and never place a server token in a `VITE_` variable.
+## Data Sources
 
-Backend, from the repository root:
+The configured City of Melbourne datasets are:
+
+| Purpose | Dataset ID |
+| --- | --- |
+| Sensor locations | `pedestrian-counting-system-sensor-locations` |
+| Past-hour minute counts | `pedestrian-counting-system-past-hour-counts-per-minute` |
+| Historical hourly counts | `pedestrian-counting-system-monthly-counts-per-hour` |
+
+Historical hourly data builds hour/day-type sensor and network baselines. The
+minute source builds a complete recent 15-minute materialisation. Data states
+distinguish valid observations, ambiguous absence, stale source data,
+conflicts, and no data. Explicit zero remains a real zero; missing data remains
+null.
+
+Mapbox supplies search results, walkable routes, distance, duration, full
+geometry, and maneuver instructions. It does not supply CalmWay pedestrian
+activity.
+
+The production source of record is PostgreSQL/PostGIS. `data/raw/` and
+`data/processed/` are empty tracked staging directories for controlled local
+work; no production dataset is bundled in Git.
+
+## Crowd Evaluation
+
+### Active pedestrian-flow comparison
+
+Each route is sampled at the configured 50 m interval. Nearby active outdoor
+sensors contribute separately to recent and historical movements/min estimates
+using normalised inverse-distance weighting. Route-level median, continuous
+P75, maximum, and coverage are calculated for each source.
+
+The active route selector uses recent evidence only when every candidate has at
+least 55% coverage and a numeric recent P75. Otherwise it uses historical
+evidence when every candidate qualifies. If neither common basis exists, crowd
+comparison is unavailable rather than mixed or fabricated.
+
+### Preference-aware Crowd Exposure
+
+The separate `/api/v1/routes/walking` path evaluates a 0-100 current network
+percentile at every sample. A nearest usable sensor within 250 m is
+`SUPPORTED`; one over 250 m and at most 300 m is `LIMITED`; otherwise it is
+`NO_DATA`. Only numeric supported/limited samples participate in route
+aggregation.
+
+Network Crowd Exposure and local historical condition remain separate. The
+scores are relative pedestrian-activity indicators, not persons per square
+metre, clinical tolerance, or a guarantee that every point has the displayed
+number of people.
+
+## Route Ranking
+
+The active route-options contract assigns:
+
+- `FASTEST` by duration, then deterministic ties;
+- `CALMEST` by a common-source P75, with a practical 0.05 movements/min tie and
+  median/maximum/time/distance tie-breaks;
+- `BALANCED` from equal-weight normalised duration and P75 flow when at least
+  three candidates are eligible.
+
+The preference-aware walking contract applies a 55% numeric coverage gate,
+then orders evaluable routes by No Data percentage, percentage above the
+selected preference, P75 Crowd Exposure, maximum exposure, duration, and
+Mapbox route index. Above-preference routes remain visible. If every route is
+insufficient, no recommendation is fabricated.
+
+See [Route Ranking](docs/route-ranking.md) for exact formulas, thresholds,
+tie-breaking, and No Data handling.
+
+## Navigation Crowd Alerts
+
+The backend alert engine evaluates the route section
+`(current progress, current progress + 300 m]` using the preference thresholds
+50/75/90. An alert requires at least two consecutive usable samples strictly
+above the threshold. Usable evidence without that streak is `CLEAR`; no usable
+evidence is `INSUFFICIENT_DATA`.
+
+The API currently evaluates once at explicit progress `0 m`. It does not claim
+GPS-derived progress. The active Navigation page does not render this alert
+contract. See [Navigation Alerts](docs/navigation-alerts.md) for exact behavior
+and limitations.
+
+## Project Structure
+
+```text
+.
+|-- .github/workflows/       Scheduled current-activity refresh
+|-- backend/
+|   |-- app/api/             FastAPI endpoints
+|   |-- app/db/              Engine lifecycle and database errors
+|   |-- app/models/          Domain records and enums
+|   |-- app/repositories/    SQL/PostGIS access
+|   |-- app/schemas/         Pydantic API contracts
+|   |-- app/services/        Ingestion, crowd, routing, and baselines
+|   |-- index.py             Vercel FastAPI entry point
+|   `-- requirements.txt
+|-- data/                    Empty tracked local staging directories
+|-- docs/                    Maintained English documentation
+|-- frontend/
+|   |-- src/components/      UI, route, crowd, and map components
+|   |-- src/context/         In-memory journey state
+|   |-- src/pages/           Home, Search, Options, Navigation, Arrival
+|   |-- src/services/        API, Mapbox search, geolocation
+|   `-- tests/               Vitest/Testing Library tests
+|-- handoff/                 Frozen backend/data contract and schema
+|-- scripts/                 Explicit import, refresh, and evaluation tools
+`-- tests/                   Backend unit and opt-in integration tests
+```
+
+## Environment Variables
+
+Copy safe placeholders from `.env.example` to ignored local environment files.
+Do not edit the template with real credentials.
+
+Required for the active local end-to-end journey:
+
+| Variable | Location | Purpose |
+| --- | --- | --- |
+| `VITE_API_BASE_URL` | frontend | FastAPI base URL; defaults to `http://localhost:8000` |
+| `VITE_MAPBOX_PUBLIC_TOKEN` | frontend | Browser-safe Mapbox Search/GL token |
+| `DATABASE_URL` | backend | PostgreSQL/PostGIS SQLAlchemy URL |
+| `MAPBOX_ACCESS_TOKEN` | backend | Secret Mapbox Directions token |
+| `FRONTEND_ORIGINS` | backend | Comma-separated browser origins allowed by CORS |
+
+Operational/optional variables include `REFRESH_SECRET`, `APP_TIMEZONE`,
+`VITE_HOME_ROUTE`, route sampling/coverage settings, spatial radii/weighting,
+preference thresholds, alert settings, City dataset settings, Mapbox Directions
+profile/timeout, minute interval, and optional source-staleness threshold.
+
+All `VITE_` values are public in the browser bundle. See
+[Deployment Guide](docs/deployment-guide.md) for the verified complete list and
+production settings.
+
+## Local Setup
+
+### 1. Install backend dependencies
+
+From the repository root:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r backend\requirements.txt
+```
+
+### 2. Install frontend dependencies
+
+```powershell
+cd frontend
+npm ci
+cd ..
+```
+
+Use Node.js 20 or newer. If PowerShell blocks `npm.ps1`, run the equivalent
+`npm.cmd` command.
+
+### 3. Configure environment
+
+Use `.env.example` as a reference. Put frontend values in `frontend/.env` and
+backend values in `backend/.env`, or set process environment variables. Both
+locations are ignored by Git.
+
+### 4. Prepare PostgreSQL/PostGIS
+
+Create a controlled PostgreSQL database, enable PostGIS, and apply:
+
+```powershell
+psql $env:DATABASE_URL -f handoff/epic1_backend_handoff_v3/05_DATABASE_SCHEMA.sql
+```
+
+On macOS/Linux:
+
+```bash
+psql "$DATABASE_URL" -f handoff/epic1_backend_handoff_v3/05_DATABASE_SCHEMA.sql
+```
+
+Then use the scripts described in `scripts/README.md` to import sensor
+locations/hourly counts, build historical baselines, and refresh current
+activity. Run `--dry-run` first where supported. Do not point write scripts at a
+shared/production database without explicit approval.
+
+## Running the Application
+
+Start FastAPI from the repository root:
+
+```powershell
 python -m uvicorn backend.app.main:app --reload
 ```
 
-Frontend, in another terminal:
+Start Vite in another terminal:
 
 ```powershell
 cd frontend
-npm install
 npm run dev
 ```
 
-Local URLs:
+Local endpoints:
 
-- frontend: `http://localhost:5173`
-- backend: `http://localhost:8000`
-- health check: `GET http://localhost:8000/health`
-- Swagger: `http://localhost:8000/docs`
+- frontend: `http://localhost:5173`;
+- backend: `http://localhost:8000`;
+- health: `http://localhost:8000/health`;
+- Swagger/OpenAPI: `http://localhost:8000/docs`.
 
-## Verification
+## Testing
 
-From the repository root:
+Backend, from the repository root:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest
-.\.venv\Scripts\python.exe .\scripts\check_database.py
-.\.venv\Scripts\python.exe .\scripts\import_sensor_locations.py --dry-run
-.\.venv\Scripts\python.exe .\scripts\import_hourly_counts.py --dry-run --start-date 2024-08-10 --end-date 2026-02-07
-.\.venv\Scripts\python.exe .\scripts\build_historical_baselines.py --dry-run
-.\.venv\Scripts\python.exe .\scripts\build_historical_baselines.py
-.\.venv\Scripts\python.exe .\scripts\refresh_current_activity.py --dry-run
-.\.venv\Scripts\python.exe .\scripts\refresh_current_activity.py
-.\.venv\Scripts\python.exe .\scripts\evaluate_crowd_point.py --longitude 144.96 --latitude -37.81
-.\.venv\Scripts\python.exe .\scripts\evaluate_route_crowd_alert.py
-cd frontend
+python -m pytest -q
+```
+
+Frontend, from `frontend/`:
+
+```powershell
+npm test
 npm run build
 ```
 
-Later-phase tests for real route evaluation, GPS progress, and crowd-triggered
-rerouting are intentionally deferred until those features exist.
+Live City, Mapbox, and PostGIS integration tests are opt-in and require
+explicit environment gates. See [Testing Guide](docs/testing-guide.md) for
+focused commands, all gates, API smoke requests, acceptance checks, and
+deployed checks.
+
+## Production Deployment
+
+The two current Vercel projects are `calmway-backend` and
+`calmway-frontend`. From each project root after configuring the correct Vercel
+environment:
+
+```bash
+vercel link
+vercel --prod
+```
+
+The frontend requires production API/public Mapbox values. The backend requires
+the pooled PostgreSQL/PostGIS URL, secret Directions token, exact frontend CORS
+origin, and refresh secret. The database schema and data must already exist;
+deployment does not run ingestion or migrations.
+
+See [Deployment Guide](docs/deployment-guide.md) before deploying.
+
+## Production URLs
+
+- Frontend: `https://calmway-frontend.vercel.app`
+- Backend: `https://calmway-backend.vercel.app`
+- Health: `https://calmway-backend.vercel.app/health`
+- API documentation: `https://calmway-backend.vercel.app/docs`
+
+The frontend root and backend health endpoint returned HTTP 200 when verified
+on 2026-08-13. Availability can change; run the documented smoke checks for a
+current deployment decision.
+
+## API Documentation
+
+FastAPI generates the OpenAPI schema and Swagger UI at `/docs`.
+
+Current public/operational endpoints:
+
+- `GET /health`;
+- `GET /api/v1/crowd/point?lat=...&lon=...`;
+- `POST /api/v1/routes/options` (active frontend contract);
+- `POST /api/v1/routes/walking` (preference-aware compatibility contract);
+- `POST /api/v1/internal/refresh-current-activity` (Bearer-authenticated
+  operational write).
+
+Use the schemas generated by the deployed backend rather than copying request
+or response payloads from old phase documents.
+
+## Known Limitations
+
+- Pedestrian crowd exposure is only one sensory proxy.
+- Sensor coverage is spatially and temporally limited.
+- Recent estimates depend on complete published City source windows and may lag
+  wall-clock time.
+- Historical fallback is a typical hourly baseline, not live observation.
+- The active frontend does not expose Low/Medium/High crowd preference.
+- Preference-aware P75 ranking and initial alert decisions are backend-only in
+  the current active journey.
+- Navigation does not continuously track GPS, map-match, advance maneuvers,
+  detect off-route movement, or periodically re-evaluate crowd conditions.
+- No dynamic rerouting or automatic alternative-route switching is active.
+- Journey state is in memory and is lost on full refresh.
+- Roles are relative to the returned candidate set, not an absolute guarantee
+  of calmness.
+- The project is an MVP and has not been clinically or scientifically validated
+  as a sensory-accessibility intervention.
+
+## Repository Documentation
+
+- [Acceptance Criteria](docs/acceptance-criteria.md)
+- [Architecture](docs/architecture.md)
+- [Route Ranking](docs/route-ranking.md)
+- [Navigation Alerts](docs/navigation-alerts.md)
+- [Testing Guide](docs/testing-guide.md)
+- [Deployment Guide](docs/deployment-guide.md)
+- [Team Guide](docs/team-guide.md)
+
+The frozen backend/data handoff remains under
+`handoff/epic1_backend_handoff_v3/`; maintained product and engineering guidance
+is kept in the seven English documents above.

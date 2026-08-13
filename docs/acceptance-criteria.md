@@ -1,65 +1,93 @@
-# Epic 1 Acceptance Scope
+# Epic 1 Acceptance Criteria
 
-## User Story 1.1
+## Product boundary
 
-Users can enter a walking origin and destination, select one crowd tolerance,
-compare one to three available route candidates, and see a LOW/MEDIUM/HIGH
-crowd indicator for each route.
+CalmWay's sensory-aware design goal is to help sensory-sensitive pedestrians
+make a more informed route choice. The measurable proxy currently available is
+pedestrian crowd exposure. CalmWay does not measure noise, lighting, smell,
+surface quality, weather, construction, or an individual's complete sensory
+experience.
 
-## User Story 1.2
+Two route contracts coexist in the current repository:
 
-The final backend evaluates high pedestrian-activity exposure and recommends a
-route using the authoritative CalmWay ranking, rather than choosing the
-shortest candidate by default.
+- The active React journey calls `POST /api/v1/routes/options`. It compares one
+  to three routes using recent or historical pedestrian movements per minute
+  and labels eligible routes as `CALMEST`, `FASTEST`, or `BALANCED`.
+- `POST /api/v1/routes/walking` implements the preference-aware P75 crowd
+  exposure ranking and initial route-ahead alert described by User Stories 1.2
+  and 1.3. Its service and API behavior are tested, but the active React pages
+  do not currently call this endpoint or render its preference/alert contract.
 
-## User Story 1.3
+The status below is therefore deliberately split between backend capability
+and the active end-to-end product. An acceptance criterion is not marked as
+fully delivered merely because unused frontend code or a backend endpoint
+exists.
 
-During final active navigation, the remaining route is periodically evaluated
-against the latest complete 15-minute crowd window. If upcoming exposure
-exceeds the selected preference, the navigation page shows an alert and offers
-a lower-stimulation route when one is available, or lets the user continue.
+## Epic 1: Sensory-Aware Route Planning and Navigation Support
 
-## Phase 1 acceptance boundary
+### User Story 1.1
 
-Phase 1 establishes the full screen/state flow, typed contracts, configuration,
-backend packages, and explicit preview data. Real Mapbox routes, City data,
-PostGIS scoring, crowd ranking, GPS navigation, periodic evaluation, and
-rerouting are not yet acceptance claims.
+> As a sensory-sensitive commuter, I want to compare crowd-exposure
+> information for different routes, so that I can choose the route that best
+> matches my comfort level.
 
-## Phase 6B implementation and test mapping
+| Acceptance criterion | Current status | Verification evidence |
+| --- | --- | --- |
+| A search with valid structured origin and destination data returns one or more real walking routes with distance, duration, geometry, instructions, and crowd information. | Implemented end to end. | `frontend/src/services/api.ts`, `backend/app/api/routes.py`, `tests/test_route_options_api.py`, `frontend/tests/api.test.ts` |
+| Route crowd exposure is calculated from uniformly spaced route samples. Only numeric `SUPPORTED` and `LIMITED` samples participate; `NO_DATA` is not converted to zero. | Implemented by the preference-aware backend pipeline. | `route_sampling_service.py`, `route_crowd_evaluation_service.py`, `route_crowd_ranking_service.py`, `tests/test_route_crowd_ranking_service.py` |
+| A route below the minimum usable crowd-data coverage remains available with distance, duration, and geometry, but receives no fabricated crowd score or recommendation. | Implemented by `/api/v1/routes/walking`. The active `/routes/options` contract instead falls back from common recent data to common historical data, then to an honest unavailable state. | `tests/test_route_crowd_ranking_service.py`, `tests/test_routes_api.py`, `tests/test_route_option_selection_service.py` |
+| A user can review a route and explicitly select it. Navigation receives the exact selected backend route without refetching route options. | Implemented end to end. | `JourneyContext.tsx`, `RouteOptionsPage.tsx`, `frontend/tests/routeJourney.test.tsx` |
 
-This section records the final implementation honestly; it does not rewrite the
-historical user stories above. New reliability scenarios are labelled `Phase 6B
-robustness check` in `phase6b-acceptance-test-matrix-cn.md`.
+**Story status:** implemented for route comparison and selection. The active
+product presents pedestrian movements per minute rather than the
+preference-aware P75 score.
 
-| Historical requirement | Final status | Implementation/test evidence |
-|---|---|---|
-| User Story 1.1 | Implemented with an explicit data-availability constraint | Structured origin/destination, one selected LOW/MEDIUM/HIGH tolerance, and returned route cards were verified in the controlled browser journey. With numeric coverage, cards present a frontend crowd level; without it, the product shows `Crowd information unavailable` instead of fabricating a level. Backend evidence: `tests/test_routes_api.py`, `tests/test_route_crowd_ranking_service.py`. |
-| User Story 1.2 | Implemented | The backend owns crowd aggregation, deterministic ranking, and recommendation. Evidence: `tests/test_route_crowd_ranking_service.py`, `tests/test_routes_api.py`. |
-| User Story 1.3 | **Not implemented in full** | Navigation presents the initial route-ahead decision calculated at exactly 0 m and can switch to an eligible route already returned by Search. Periodic evaluation against newer 15-minute windows, live progress, and automatic rerouting are not implemented. Evidence for the implemented subset: `tests/test_route_crowd_alert_service.py`, `tests/test_routes_api.py`, and the Phase 6B controlled browser audit. |
-| Phase 1 acceptance boundary | Historical boundary, subsequently advanced through Phases 2–6 | Real Search Box, walking routes, PostGIS crowd scoring, route ranking, initial alert, and the complete static overview journey are now integrated. Live GPS/progress behavior remains outside the claim. |
+### User Story 1.2
 
-### Immutable backend acceptance mapping
+> As a sensory-sensitive commuter, I want routes with lower crowd exposure to
+> be prioritised, so that I can reduce exposure to highly congested pedestrian
+> areas.
 
-The handoff criteria remain authoritative and unchanged.
+| Acceptance criterion | Current status | Verification evidence |
+| --- | --- | --- |
+| Low, Medium, and High preferences map to maximum preferred crowd-exposure scores of 50, 75, and 90 respectively. Exposure is above preference only when `score > threshold`; equality is within preference. | Implemented and tested in the backend. Not selectable in the active React journey. | `backend/app/config.py`, `tests/test_route_crowd_ranking_service.py` |
+| Evaluable routes are ordered by the documented crowd-aware lexicographic ranking, not simply by shortest duration. | Implemented by `/api/v1/routes/walking`. | `route_crowd_ranking_service.py`, `tests/test_route_crowd_ranking_service.py`, `tests/test_routes_api.py` |
+| The best evaluable route is recommended even when every evaluable route is above the selected preference. If no route reaches the coverage threshold, no recommendation is fabricated. | Implemented by `/api/v1/routes/walking`. | `tests/test_route_crowd_ranking_service.py` |
+| Routes above preference remain visible and retain their truthful metrics instead of being hard-filtered. | Implemented in the backend response contract. | `tests/test_routes_api.py` |
 
-| Handoff criteria | Primary regression evidence |
-|---|---|
-| AC-B01–B02 | `tests/test_hourly_count_ingestion.py`, `tests/test_hourly_count_repository.py`, database schema integration |
-| AC-B03–B05 | `tests/test_minute_ingestion.py`, `tests/test_current_activity_service.py` |
-| AC-B06–B07 | `tests/test_current_activity_service.py`, `tests/test_crowd_contract.py` |
-| AC-B08–B11 | `tests/test_spatial_crowd_service.py`, `tests/test_spatial_repository.py`, controlled PostGIS integration |
-| AC-B12–B16 | `tests/test_current_activity_service.py` |
-| AC-B17–B20 | `tests/test_historical_baseline_service.py`, `tests/test_baseline_repository.py` |
-| AC-B21 | `tests/test_current_activity_service.py`, `tests/test_crowd_contract.py` |
-| AC-B22 | `tests/test_route_sampling_service.py` |
-| AC-B23 | `tests/test_route_crowd_ranking_service.py`, `tests/test_routes_api.py` |
-| AC-B24 | `tests/test_route_crowd_evaluation_service.py`, `tests/test_walking_routing_service.py`, `tests/test_routes_api.py` |
+**Story status:** backend-complete but not end-to-end in the active frontend.
+The current React journey uses role selection based on pedestrian movements per
+minute rather than the preference-aware ranking response.
 
-Phase 6B full regression result: **251 passed, 8 skipped, 0 failed**. The
-skipped tests require explicitly enabled live City, Mapbox, or controlled
-database integration conditions; the read-only database readiness test ran and
-passed.
+### User Story 1.3
 
-Crowd levels are relative pedestrian-activity estimates. They do not represent
-persons/m² density, medical tolerance, or a safety guarantee.
+> As a sensory-sensitive commuter, I want to receive an alert when crowd
+> exposure on the route ahead exceeds my preferred threshold, so that I can
+> make a more informed decision before continuing my journey.
+
+| Acceptance criterion | Current status | Verification evidence |
+| --- | --- | --- |
+| The alert evaluation uses the selected Low, Medium, or High preference threshold. | Implemented in the backend; no active frontend preference selection. | `route_crowd_alert_service.py`, `tests/test_route_crowd_alert_service.py` |
+| The upcoming section is `(current progress, current progress + 300 m]`. The current API evaluates once at an explicit progress of `0 m`. | Implemented and tested. This is a route-start assessment, not measured GPS progress. | `backend/app/api/routes.py`, `tests/test_route_crowd_alert_service.py`, `tests/test_routes_api.py` |
+| `ALERT` is triggered by at least two consecutive usable route samples strictly above the selected threshold. A missing, nonnumeric, or at/below-threshold sample breaks the streak. | Implemented and tested. | `route_crowd_alert_service.py`, `tests/test_route_crowd_alert_service.py` |
+| When usable evidence exists but no qualifying streak exists, the decision is `CLEAR`. With no usable evidence, the decision is `INSUFFICIENT_DATA`; missing evidence is never presented as clear. | Implemented and tested. | `tests/test_route_crowd_alert_service.py`, `tests/test_routes_api.py` |
+| The active Navigation page renders the backend alert state to the user. | Not currently implemented end to end. `CrowdAlertPanel.tsx` and compatibility parsing code exist but are not referenced by the active page tree. | `frontend/src/pages/NavigationPage.tsx`, repository reference search |
+
+**Story status:** the deterministic initial alert engine and API contract are
+implemented; delivery in the active user journey is incomplete.
+
+## Explicit exclusions
+
+The current implementation does not provide:
+
+- continuous GPS tracking or measured route progress;
+- periodic or streaming crowd re-evaluation;
+- automatic rerouting;
+- generation of a new alternative after navigation starts;
+- active current-route versus alternative-route switching in the current UI;
+- medical, personal-safety, or comprehensive sensory guarantees.
+
+Navigation is a static selected-route overview using backend-provided route
+instructions. See [Navigation Alerts](navigation-alerts.md) for the precise
+implemented engine boundary and [Route Ranking](route-ranking.md) for both
+route-selection contracts.
