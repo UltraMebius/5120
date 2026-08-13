@@ -25,6 +25,9 @@ class WaypointFlowSource(str, Enum):
 class CandidateGenerationReason(str, Enum):
     MULTIPLE_MAPBOX_ROUTES = "MULTIPLE_MAPBOX_ROUTES"
     WAYPOINT_ALTERNATIVE_ADDED = "WAYPOINT_ALTERNATIVE_ADDED"
+    RELAXED_DETOUR_ALTERNATIVE_ADDED = (
+        "RELAXED_DETOUR_ALTERNATIVE_ADDED"
+    )
     ONLY_ONE_MEANINGFUL_CORRIDOR = "ONLY_ONE_MEANINGFUL_CORRIDOR"
     NO_VALID_WAYPOINT = "NO_VALID_WAYPOINT"
     ALTERNATIVES_TOO_SIMILAR = "ALTERNATIVES_TOO_SIMILAR"
@@ -42,6 +45,7 @@ class WaypointSensorEvidence:
     distance_from_destination_meters: float
     distance_from_direct_route_meters: float
     estimated_geometric_detour_meters: float
+    projected_route_progress: float
     sensor_flow: SensorPedestrianFlow
 
 
@@ -64,6 +68,7 @@ class SelectedFlowWaypoint:
     pedestrian_movements_per_minute: float
     estimated_geometric_detour_meters: float
     distance_from_direct_route_meters: float
+    projected_route_progress: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,6 +113,18 @@ class CandidateGenerationTimings:
     candidate_count_before_filter: int
     candidate_count_after_filter: int
     flow_sql_execution_count: int
+    strict_detour_limit_seconds: float = 0.0
+    relaxed_detour_limit_seconds: float = 0.0
+    strict_candidate_count: int = 0
+    relaxed_candidate_count: int = 0
+    rejected_strict_detour_count: int = 0
+    rejected_relaxed_detour_count: int = 0
+    relaxed_fallback_activated: bool = False
+    target_route_count: int = 3
+    final_route_count: int = 0
+    third_route_attempted: bool = False
+    third_route_added: bool = False
+    remaining_request_budget: int = 0
 
 
 @dataclass(frozen=True, slots=True)

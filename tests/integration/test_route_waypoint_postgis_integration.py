@@ -26,6 +26,8 @@ INACTIVE_ID = 9_996_106
 INDOOR_ID = 9_996_107
 OUTSIDE_CORRIDOR_ID = 9_996_108
 EXCESSIVE_GEOMETRIC_DETOUR_ID = 9_996_109
+TOO_EARLY_PROGRESS_ID = 9_996_110
+DESTINATION_END_PROGRESS_ID = 9_996_111
 TEST_IDS = (
     LIVE_ID,
     HISTORICAL_ID,
@@ -36,6 +38,8 @@ TEST_IDS = (
     INDOOR_ID,
     OUTSIDE_CORRIDOR_ID,
     EXCESSIVE_GEOMETRIC_DETOUR_ID,
+    TOO_EARLY_PROGRESS_ID,
+    DESTINATION_END_PROGRESS_ID,
 )
 
 ORIGIN = (144.2, -38.8)
@@ -279,6 +283,26 @@ def test_controlled_waypoint_evidence_uses_real_postgis_then_rolls_back() -> Non
                             "route_offset_m": 580.0,
                             "offset_bearing_degrees": 270.0,
                         },
+                        {
+                            "location_id": TOO_EARLY_PROGRESS_ID,
+                            "location_type": "Outdoor",
+                            "status": "A",
+                            "origin_longitude": ORIGIN[0],
+                            "origin_latitude": ORIGIN[1],
+                            "distance_along_route_m": 50.0,
+                            "route_offset_m": 200.0,
+                            "offset_bearing_degrees": 90.0,
+                        },
+                        {
+                            "location_id": DESTINATION_END_PROGRESS_ID,
+                            "location_type": "Outdoor",
+                            "status": "A",
+                            "origin_longitude": ORIGIN[0],
+                            "origin_latitude": ORIGIN[1],
+                            "distance_along_route_m": 1_100.0,
+                            "route_offset_m": 200.0,
+                            "offset_bearing_degrees": 90.0,
+                        },
                     ],
                 )
                 connection.execute(
@@ -488,6 +512,19 @@ def test_controlled_waypoint_evidence_uses_real_postgis_then_rolls_back() -> Non
                     + detour_metric["destination_distance_m"]
                     > 1.5 * detour_metric["direct_distance_m"]
                 )
+                for progress_excluded_id in (
+                    TOO_EARLY_PROGRESS_ID,
+                    DESTINATION_END_PROGRESS_ID,
+                ):
+                    metric = fixture_metrics[progress_excluded_id]
+                    assert 35.0 < metric["route_distance_m"] <= 600.0
+                    assert metric["origin_distance_m"] >= 150.0
+                    assert metric["destination_distance_m"] >= 150.0
+                    assert (
+                        metric["origin_distance_m"]
+                        + metric["destination_distance_m"]
+                        <= 1.5 * metric["direct_distance_m"]
+                    )
 
                 result = RouteWaypointRepository(
                     connection=connection
@@ -522,6 +559,9 @@ def test_controlled_waypoint_evidence_uses_real_postgis_then_rolls_back() -> Non
                 )
                 assert live.distance_from_origin_meters >= 150.0
                 assert live.distance_from_destination_meters >= 150.0
+                assert live.projected_route_progress == pytest.approx(
+                    0.5, abs=0.01
+                )
                 assert live.sensor_flow.data_state == "OK"
                 assert live.sensor_flow.current_15m_count == 300
                 assert live.sensor_flow.current_15m_observed_rows == 5
@@ -548,6 +588,9 @@ def test_controlled_waypoint_evidence_uses_real_postgis_then_rolls_back() -> Non
                 assert (
                     historical.distance_from_direct_route_meters
                     == pytest.approx(200.0, abs=0.1)
+                )
+                assert historical.projected_route_progress == pytest.approx(
+                    0.5, abs=0.01
                 )
                 assert historical.sensor_flow.data_state == "NO_DATA"
                 assert historical.sensor_flow.current_15m_count is None

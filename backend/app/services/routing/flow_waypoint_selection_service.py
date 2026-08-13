@@ -5,9 +5,11 @@ import math
 from typing import Protocol
 
 from .route_candidate_config import (
+    MAXIMUM_WAYPOINT_ROUTE_PROGRESS,
     MAXIMUM_WAYPOINT_ATTEMPTS,
     MINIMUM_WAYPOINT_ENDPOINT_DISTANCE_M,
     MINIMUM_WAYPOINT_ROUTE_OFFSET_M,
+    MINIMUM_WAYPOINT_ROUTE_PROGRESS,
     WAYPOINT_SEARCH_CORRIDOR_RADIUS_M,
 )
 from .route_candidate_models import (
@@ -53,6 +55,7 @@ class FlowWaypointSelectionService:
             evidence.distance_from_destination_meters,
             evidence.distance_from_direct_route_meters,
             evidence.estimated_geometric_detour_meters,
+            evidence.projected_route_progress,
         )
         if any(not math.isfinite(value) for value in numeric):
             raise WaypointEvidenceConsistencyError(
@@ -69,6 +72,10 @@ class FlowWaypointSelectionService:
             and evidence.distance_from_direct_route_meters
             <= WAYPOINT_SEARCH_CORRIDOR_RADIUS_M
             and evidence.estimated_geometric_detour_meters >= 0.0
+            and evidence.projected_route_progress
+            >= MINIMUM_WAYPOINT_ROUTE_PROGRESS
+            and evidence.projected_route_progress
+            <= MAXIMUM_WAYPOINT_ROUTE_PROGRESS
         )
 
     @staticmethod
@@ -89,6 +96,7 @@ class FlowWaypointSelectionService:
             distance_from_direct_route_meters=(
                 evidence.distance_from_direct_route_meters
             ),
+            projected_route_progress=evidence.projected_route_progress,
         )
 
     def select_waypoints(

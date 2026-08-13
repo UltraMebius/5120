@@ -13,9 +13,11 @@ from ..db.connection import get_database_engine
 from ..db.exceptions import DatabaseQueryError
 from ..models.pedestrian_flow import PedestrianFlowSnapshot, SensorPedestrianFlow
 from ..services.routing.route_candidate_config import (
+    MAXIMUM_WAYPOINT_ROUTE_PROGRESS,
     MAXIMUM_WAYPOINT_GEOMETRIC_DETOUR_MULTIPLIER,
     MINIMUM_WAYPOINT_ENDPOINT_DISTANCE_M,
     MINIMUM_WAYPOINT_ROUTE_OFFSET_M,
+    MINIMUM_WAYPOINT_ROUTE_PROGRESS,
     WAYPOINT_SEARCH_CORRIDOR_RADIUS_M,
 )
 from ..services.routing.route_candidate_models import (
@@ -35,7 +37,7 @@ _FIND_WAYPOINT_EVIDENCE = text(
                 ST_MakePoint(:destination_longitude, :destination_latitude),
                 4326
             )::geography AS destination_geom,
-            ST_SetSRID(ST_GeomFromGeoJSON(:route_geojson), 4326)::geography
+            ST_SetSRID(ST_GeomFromGeoJSON(:route_geojson), 4326)
                 AS route_geom
     ),
     current_snapshot AS (
@@ -76,8 +78,12 @@ _FIND_WAYPOINT_EVIDENCE = text(
                 AS distance_from_origin_meters,
             ST_Distance(location.geom, journey.destination_geom)
                 AS distance_from_destination_meters,
-            ST_Distance(location.geom, journey.route_geom)
+            ST_Distance(location.geom, journey.route_geom::geography)
                 AS distance_from_direct_route_meters,
+            ST_LineLocatePoint(
+                journey.route_geom,
+                location.geom::geometry
+            ) AS projected_route_progress,
             GREATEST(
                 ST_Distance(location.geom, journey.origin_geom)
                 + ST_Distance(location.geom, journey.destination_geom)
@@ -90,10 +96,10 @@ _FIND_WAYPOINT_EVIDENCE = text(
           AND UPPER(TRIM(location.status)) = 'A'
           AND ST_DWithin(
               location.geom,
-              journey.route_geom,
+              journey.route_geom::geography,
               :search_corridor_radius_m
           )
-          AND ST_Distance(location.geom, journey.route_geom)
+          AND ST_Distance(location.geom, journey.route_geom::geography)
               > :minimum_route_offset_m
           AND ST_Distance(location.geom, journey.origin_geom)
               >= :minimum_endpoint_distance_m
@@ -103,6 +109,14 @@ _FIND_WAYPOINT_EVIDENCE = text(
               + ST_Distance(location.geom, journey.destination_geom)
               <= :geometric_detour_multiplier
                  * ST_Distance(journey.origin_geom, journey.destination_geom)
+          AND ST_LineLocatePoint(
+              journey.route_geom,
+              location.geom::geometry
+          ) >= :minimum_route_progress
+          AND ST_LineLocatePoint(
+              journey.route_geom,
+              location.geom::geometry
+          ) <= :maximum_route_progress
     )
     SELECT
         candidate.location_id,
@@ -114,6 +128,7 @@ _FIND_WAYPOINT_EVIDENCE = text(
         candidate.distance_from_destination_meters,
         candidate.distance_from_direct_route_meters,
         candidate.estimated_geometric_detour_meters,
+        candidate.projected_route_progress,
         context.window_start AS snapshot_window_start,
         context.window_end AS snapshot_window_end,
         context.calculated_at AS snapshot_calculated_at,
@@ -200,6 +215,8 @@ class RouteWaypointRepository:
             "search_corridor_radius_m": WAYPOINT_SEARCH_CORRIDOR_RADIUS_M,
             "minimum_route_offset_m": MINIMUM_WAYPOINT_ROUTE_OFFSET_M,
             "minimum_endpoint_distance_m": MINIMUM_WAYPOINT_ENDPOINT_DISTANCE_M,
+            "minimum_route_progress": MINIMUM_WAYPOINT_ROUTE_PROGRESS,
+            "maximum_route_progress": MAXIMUM_WAYPOINT_ROUTE_PROGRESS,
             "geometric_detour_multiplier": (
                 MAXIMUM_WAYPOINT_GEOMETRIC_DETOUR_MULTIPLIER
             ),
@@ -246,6 +263,9 @@ class RouteWaypointRepository:
                 ),
                 estimated_geometric_detour_meters=float(
                     row["estimated_geometric_detour_meters"]
+                ),
+                projected_route_progress=float(
+                    row["projected_route_progress"]
                 ),
                 sensor_flow=SensorPedestrianFlow(
                     location_id=int(row["location_id"]),

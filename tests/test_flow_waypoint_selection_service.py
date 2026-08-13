@@ -1,5 +1,7 @@
 from datetime import date, datetime, timezone
 
+import pytest
+
 from backend.app.models.pedestrian_flow import (
     PedestrianFlowSnapshot,
     SensorPedestrianFlow,
@@ -51,6 +53,7 @@ def _evidence(
     sensor: SensorPedestrianFlow,
     *,
     detour: float = 50,
+    progress: float = 0.5,
     route_offset: float = 100,
 ) -> WaypointSensorEvidence:
     return WaypointSensorEvidence(
@@ -60,6 +63,7 @@ def _evidence(
         distance_from_destination_meters=500,
         distance_from_direct_route_meters=route_offset,
         estimated_geometric_detour_meters=detour,
+        projected_route_progress=progress,
         sensor_flow=sensor,
     )
 
@@ -128,7 +132,47 @@ def test_on_route_or_endpoint_near_evidence_is_not_eligible() -> None:
         distance_from_destination_meters=500,
         distance_from_direct_route_meters=100,
         estimated_geometric_detour_meters=50,
+        projected_route_progress=0.5,
         sensor_flow=endpoint_near.sensor_flow,
     )
 
     assert _select([endpoint_near, _evidence(_sensor(2), route_offset=35)]) == ()
+
+
+@pytest.mark.parametrize("progress", [0.10, 0.50, 0.90])
+def test_middle_and_inclusive_progress_boundaries_are_eligible(progress) -> None:
+    selected = _select([_evidence(_sensor(1), progress=progress)])
+
+    assert len(selected) == 1
+    assert selected[0].projected_route_progress == progress
+
+
+def test_early_late_and_destination_end_progress_are_excluded() -> None:
+    selected = _select(
+        [
+            _evidence(_sensor(1), progress=0.0999),
+            _evidence(_sensor(2), progress=0.9001),
+            _evidence(_sensor(3), progress=1.0),
+        ]
+    )
+
+    assert selected == ()
+
+
+def test_lateral_middle_waypoint_remains_eligible_without_changing_flow_order() -> None:
+    selected = _select(
+        [
+            _evidence(
+                _sensor(1, live_count=60),
+                progress=0.65,
+                route_offset=250,
+            ),
+            _evidence(
+                _sensor(2, live_count=30),
+                progress=0.45,
+                route_offset=200,
+            ),
+        ]
+    )
+
+    assert [waypoint.location_id for waypoint in selected] == [2, 1]

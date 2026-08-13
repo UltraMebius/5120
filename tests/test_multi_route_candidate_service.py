@@ -8,6 +8,13 @@ from backend.app.schemas.routes import GeoJsonLineString, WalkingRouteOption
 from backend.app.services.routing.multi_route_candidate_service import (
     MultiRouteCandidateService,
     is_within_detour_limit,
+    is_within_relaxed_detour_limit,
+    relaxed_detour_limit_seconds,
+)
+from backend.app.services.routing.route_candidate_config import (
+    MAXIMUM_MEANINGFUL_ROUTES,
+    MINIMUM_MEANINGFUL_ROUTES,
+    TARGET_MEANINGFUL_ROUTES,
 )
 from backend.app.services.routing.route_candidate_models import (
     CandidateGenerationReason,
@@ -149,6 +156,7 @@ def _waypoint(
         pedestrian_movements_per_minute=5,
         estimated_geometric_detour_meters=100,
         distance_from_direct_route_meters=100,
+        projected_route_progress=0.5,
     )
 
 
@@ -167,6 +175,12 @@ def _generate(initial, *, waypoints=(), waypoint_responses=(), destination_lat=-
         destination_latitude=destination_lat,
     )
     return result, routing, waypoint_service, flow
+
+
+def test_meaningful_route_count_policy_is_explicit_and_bounded() -> None:
+    assert MINIMUM_MEANINGFUL_ROUTES == 2
+    assert TARGET_MEANINGFUL_ROUTES == 3
+    assert MAXIMUM_MEANINGFUL_ROUTES == 3
 
 
 def test_one_initial_route_is_retained_when_no_waypoint_exists() -> None:
@@ -203,7 +217,9 @@ def test_two_or_three_distinct_initial_routes_need_only_one_mapbox_call(routes) 
     assert len(result.candidates) == len(routes)
     assert result.reason is CandidateGenerationReason.MULTIPLE_MAPBOX_ROUTES
     assert routing.waypoint_calls == []
-    assert waypoint_service.calls == []
+    assert len(waypoint_service.calls) == (1 if len(routes) == 2 else 0)
+    if len(routes) == 2:
+        assert waypoint_service.calls[0]["limit"] == 1
     assert result.timings.mapbox_request_count == 1
     assert len(flow.calls) == 1
     assert len(flow.calls[0]) == len(routes)
@@ -257,10 +273,73 @@ def test_detour_limit_is_inclusive_at_one_point_five_times(duration, allowed) ->
     assert is_within_detour_limit(duration, 600) is allowed
 
 
+def test_strict_candidates_are_preferred_without_relaxed_fallback() -> None:
+    result, routing, waypoint_service, _ = _generate(
+        [
+            _route(0, DIRECT_COORDINATES, duration=600),
+            _route(1, EAST_COORDINATES, duration=850),
+            _route(2, WEST_COORDINATES, duration=880),
+        ],
+        waypoints=[_waypoint(10)],
+    )
+
+    assert [candidate.duration_seconds for candidate in result.candidates] == [
+        600,
+        850,
+        880,
+    ]
+    assert result.reason is CandidateGenerationReason.MULTIPLE_MAPBOX_ROUTES
+    assert result.timings.strict_detour_limit_seconds == 900
+    assert result.timings.relaxed_detour_limit_seconds == 1080
+    assert result.timings.strict_candidate_count == 3
+    assert result.timings.relaxed_candidate_count == 0
+    assert result.timings.relaxed_fallback_activated is False
+    assert waypoint_service.calls == []
+    assert routing.waypoint_calls == []
+
+
+def test_initial_mapbox_candidate_can_recover_under_relaxed_limit() -> None:
+    result, routing, waypoint_service, flow = _generate(
+        [
+            _route(0, DIRECT_COORDINATES, duration=600),
+            _route(1, EAST_COORDINATES, duration=1000),
+        ],
+    )
+
+    assert len(result.candidates) == 2
+    assert result.candidates[1].duration_seconds == 1000
+    assert result.reason is (
+        CandidateGenerationReason.RELAXED_DETOUR_ALTERNATIVE_ADDED
+    )
+    assert result.timings.strict_candidate_count == 1
+    assert result.timings.relaxed_candidate_count == 2
+    assert result.timings.rejected_strict_detour_count == 1
+    assert result.timings.rejected_relaxed_detour_count == 0
+    assert result.timings.relaxed_fallback_activated is True
+    assert routing.waypoint_calls == []
+    assert len(waypoint_service.calls) == 1
+    assert waypoint_service.calls[0]["limit"] == 1
+    assert len(flow.calls) == 1
+    assert len(flow.calls[0]) == 2
+
+
+@pytest.mark.parametrize(
+    ("duration", "allowed"),
+    [(1080, True), (1080.01, False)],
+)
+def test_relaxed_detour_boundary_is_inclusive(duration, allowed) -> None:
+    assert is_within_relaxed_detour_limit(duration, 600) is allowed
+
+
+def test_relaxed_limit_uses_additional_seconds_cap_for_long_routes() -> None:
+    assert relaxed_detour_limit_seconds(1800) == 2400
+    assert is_within_relaxed_detour_limit(2500, 1800) is False
+
+
 def test_first_waypoint_success_adds_distinct_candidate_with_two_calls() -> None:
     result, routing, _, flow = _generate(
         [_route(0, DIRECT_COORDINATES)],
-        waypoints=[_waypoint(10), _waypoint(20)],
+        waypoints=[_waypoint(10)],
         waypoint_responses=[[_route(0, EAST_COORDINATES, duration=700)]],
     )
 
@@ -281,17 +360,19 @@ def test_first_waypoint_success_adds_distinct_candidate_with_two_calls() -> None
     assert result.timings.total_ms >= 0.0
 
 
-def test_initial_alternative_above_detour_limit_is_rejected() -> None:
+def test_initial_alternative_above_relaxed_detour_limit_is_rejected() -> None:
     result, routing, _, _ = _generate(
         [
             _route(0, DIRECT_COORDINATES, duration=600),
-            _route(1, EAST_COORDINATES, duration=901),
+            _route(1, EAST_COORDINATES, duration=1080.01),
         ]
     )
 
     assert len(result.candidates) == 1
     assert result.reason is CandidateGenerationReason.DETOUR_LIMIT_EXCEEDED
     assert result.timings.mapbox_request_count == 1
+    assert result.timings.rejected_strict_detour_count == 1
+    assert result.timings.rejected_relaxed_detour_count == 1
     assert routing.waypoint_calls == []
 
 
@@ -316,7 +397,7 @@ def test_excessive_first_waypoint_is_rejected_then_second_is_attempted() -> None
         [_route(0, DIRECT_COORDINATES)],
         waypoints=[_waypoint(10), _waypoint(20)],
         waypoint_responses=[
-            [_route(0, EAST_COORDINATES, duration=901)],
+            [_route(0, EAST_COORDINATES, duration=1080.01)],
             [_route(0, WEST_COORDINATES, duration=850)],
         ],
     )
@@ -325,6 +406,284 @@ def test_excessive_first_waypoint_is_rejected_then_second_is_attempted() -> None
     assert result.candidates[1].duration_seconds == 850
     assert result.timings.mapbox_request_count == 3
     assert len(routing.waypoint_calls) == 2
+
+
+def test_waypoint_route_can_recover_under_relaxed_limit() -> None:
+    result, routing, _, flow = _generate(
+        [_route(0, DIRECT_COORDINATES, duration=600)],
+        waypoints=[_waypoint(10)],
+        waypoint_responses=[
+            [_route(0, EAST_COORDINATES, duration=1000)]
+        ],
+    )
+
+    assert len(result.candidates) == 2
+    assert result.candidates[1].candidate_source is (
+        RouteCandidateSource.FLOW_WAYPOINT
+    )
+    assert result.candidates[1].duration_seconds == 1000
+    assert result.reason is (
+        CandidateGenerationReason.RELAXED_DETOUR_ALTERNATIVE_ADDED
+    )
+    assert result.timings.mapbox_request_count == 2
+    assert result.timings.strict_candidate_count == 1
+    assert result.timings.relaxed_candidate_count == 2
+    assert result.timings.rejected_strict_detour_count == 1
+    assert result.timings.rejected_relaxed_detour_count == 0
+    assert len(routing.waypoint_calls) == 1
+    assert len(flow.calls) == 1
+    assert len(flow.calls[0]) == 2
+    assert result.timings.flow_sql_execution_count == 1
+
+
+def test_waypoint_route_above_relaxed_limit_remains_rejected() -> None:
+    result, routing, _, flow = _generate(
+        [_route(0, DIRECT_COORDINATES, duration=600)],
+        waypoints=[_waypoint(10)],
+        waypoint_responses=[
+            [_route(0, EAST_COORDINATES, duration=1080.01)]
+        ],
+    )
+
+    assert len(result.candidates) == 1
+    assert result.reason is CandidateGenerationReason.DETOUR_LIMIT_EXCEEDED
+    assert result.timings.mapbox_request_count == 2
+    assert result.timings.rejected_strict_detour_count == 1
+    assert result.timings.rejected_relaxed_detour_count == 1
+    assert len(routing.waypoint_calls) == 1
+    assert len(flow.calls) == 1
+    assert len(flow.calls[0]) == 1
+
+
+def test_relaxed_waypoint_still_must_be_meaningfully_distinct() -> None:
+    result, _, _, _ = _generate(
+        [_route(0, DIRECT_COORDINATES, duration=600)],
+        waypoints=[_waypoint(10)],
+        waypoint_responses=[
+            [_route(0, DIRECT_COORDINATES, duration=1000)]
+        ],
+    )
+
+    assert len(result.candidates) == 1
+    assert result.reason is CandidateGenerationReason.ALTERNATIVES_TOO_SIMILAR
+    assert result.timings.rejected_strict_detour_count == 1
+    assert result.timings.rejected_relaxed_detour_count == 0
+
+
+def test_cbd_duration_regression_recovers_one_distinct_alternative() -> None:
+    fastest_duration = 822.257
+    result, routing, _, flow = _generate(
+        [_route(0, DIRECT_COORDINATES, duration=fastest_duration)],
+        waypoints=[_waypoint(10)],
+        waypoint_responses=[
+            [_route(0, EAST_COORDINATES, duration=1300)]
+        ],
+    )
+
+    assert result.timings.strict_detour_limit_seconds == pytest.approx(
+        fastest_duration * 1.5
+    )
+    assert result.timings.relaxed_detour_limit_seconds == pytest.approx(
+        fastest_duration + 600
+    )
+    assert len(result.candidates) == 2
+    assert result.candidates[1].duration_seconds == 1300
+    assert result.reason is (
+        CandidateGenerationReason.RELAXED_DETOUR_ALTERNATIVE_ADDED
+    )
+    assert result.timings.mapbox_request_count == 2
+    assert len(routing.waypoint_calls) == 1
+    assert len(flow.calls) == 1
+    assert len(flow.calls[0]) == 2
+
+
+def test_candidate_diagnostics_log_safe_relaxed_aggregates(caplog) -> None:
+    with caplog.at_level(
+        "INFO",
+        logger=(
+            "backend.app.services.routing.multi_route_candidate_service"
+        ),
+    ):
+        _generate(
+            [_route(0, DIRECT_COORDINATES, duration=600)],
+            waypoints=[_waypoint(10)],
+            waypoint_responses=[
+                [_route(0, EAST_COORDINATES, duration=1000)]
+            ],
+        )
+
+    message = next(
+        record.getMessage()
+        for record in caplog.records
+        if record.getMessage().startswith("multi_route_candidates ")
+    )
+    for field in (
+        "strict_detour_limit_seconds=900.000",
+        "relaxed_detour_limit_seconds=1080.000",
+        "strict_candidate_count=1",
+        "relaxed_candidate_count=2",
+        "rejected_strict_detour_count=1",
+        "rejected_relaxed_detour_count=0",
+        "mapbox_request_count=2",
+        "candidate_count_after_filter=2",
+        "target_route_count=3",
+        "final_route_count=2",
+        "third_route_attempted=False",
+        "third_route_added=False",
+        "remaining_request_budget=1",
+        "generation_reason=RELAXED_DETOUR_ALTERNATIVE_ADDED",
+    ):
+        assert field in message
+    assert "144." not in message
+    assert "-37." not in message
+
+
+def test_initial_two_routes_attempt_one_distinct_waypoint_third() -> None:
+    result, routing, waypoint_service, flow = _generate(
+        [
+            _route(0, DIRECT_COORDINATES, duration=600),
+            _route(1, EAST_COORDINATES, duration=700),
+        ],
+        waypoints=[_waypoint(10), _waypoint(20)],
+        waypoint_responses=[
+            [_route(0, WEST_COORDINATES, duration=800)]
+        ],
+    )
+
+    assert len(result.candidates) == 3
+    assert result.timings.mapbox_request_count == 2
+    assert len(routing.waypoint_calls) == 1
+    assert waypoint_service.calls[0]["limit"] == 1
+    assert result.timings.target_route_count == 3
+    assert result.timings.final_route_count == 3
+    assert result.timings.third_route_attempted is True
+    assert result.timings.third_route_added is True
+    assert result.timings.remaining_request_budget == 1
+    assert len(flow.calls) == 1
+    assert len(flow.calls[0]) == 3
+    assert result.timings.flow_sql_execution_count == 1
+
+
+def test_initial_one_route_uses_two_waypoints_to_reach_target_three() -> None:
+    result, routing, waypoint_service, flow = _generate(
+        [_route(0, DIRECT_COORDINATES, duration=600)],
+        waypoints=[_waypoint(10), _waypoint(20)],
+        waypoint_responses=[
+            [_route(0, EAST_COORDINATES, duration=700)],
+            [_route(0, WEST_COORDINATES, duration=800)],
+        ],
+    )
+
+    assert len(result.candidates) == 3
+    assert result.timings.mapbox_request_count == 3
+    assert len(routing.waypoint_calls) == 2
+    assert waypoint_service.calls[0]["limit"] == 2
+    assert [
+        candidate.waypoint_metadata.location_id
+        for candidate in result.candidates
+        if candidate.candidate_source is RouteCandidateSource.FLOW_WAYPOINT
+    ] == [10, 20]
+    assert result.timings.third_route_attempted is True
+    assert result.timings.third_route_added is True
+    assert result.timings.remaining_request_budget == 0
+    assert len(flow.calls) == 1
+    assert len(flow.calls[0]) == 3
+    assert result.timings.flow_sql_execution_count == 1
+
+
+def test_third_waypoint_route_too_similar_to_second_is_rejected() -> None:
+    result, routing, _, flow = _generate(
+        [
+            _route(0, DIRECT_COORDINATES, duration=600),
+            _route(1, EAST_COORDINATES, duration=700),
+        ],
+        waypoints=[_waypoint(10)],
+        waypoint_responses=[
+            [_route(0, EAST_COORDINATES, duration=750)]
+        ],
+    )
+
+    assert len(result.candidates) == 2
+    assert result.timings.mapbox_request_count == 2
+    assert len(routing.waypoint_calls) == 1
+    assert result.timings.third_route_attempted is True
+    assert result.timings.third_route_added is False
+    assert len(flow.calls) == 1
+    assert len(flow.calls[0]) == 2
+
+
+def test_third_waypoint_route_above_relaxed_limit_is_rejected() -> None:
+    result, routing, _, _ = _generate(
+        [
+            _route(0, DIRECT_COORDINATES, duration=600),
+            _route(1, EAST_COORDINATES, duration=700),
+        ],
+        waypoints=[_waypoint(10)],
+        waypoint_responses=[
+            [_route(0, WEST_COORDINATES, duration=1080.01)]
+        ],
+    )
+
+    assert len(result.candidates) == 2
+    assert result.timings.mapbox_request_count == 2
+    assert len(routing.waypoint_calls) == 1
+    assert result.timings.rejected_strict_detour_count == 1
+    assert result.timings.rejected_relaxed_detour_count == 1
+    assert result.timings.third_route_added is False
+
+
+def test_two_routes_without_remaining_waypoint_is_valid_result() -> None:
+    result, routing, waypoint_service, _ = _generate(
+        [
+            _route(0, DIRECT_COORDINATES, duration=600),
+            _route(1, EAST_COORDINATES, duration=700),
+        ]
+    )
+
+    assert len(result.candidates) == 2
+    assert result.reason is CandidateGenerationReason.MULTIPLE_MAPBOX_ROUTES
+    assert result.timings.mapbox_request_count == 1
+    assert len(waypoint_service.calls) == 1
+    assert waypoint_service.calls[0]["limit"] == 1
+    assert routing.waypoint_calls == []
+    assert result.timings.third_route_attempted is False
+    assert result.timings.third_route_added is False
+
+
+def test_duplicate_waypoint_sensor_is_not_requested_twice() -> None:
+    result, routing, _, _ = _generate(
+        [_route(0, DIRECT_COORDINATES, duration=600)],
+        waypoints=[_waypoint(10), _waypoint(10)],
+        waypoint_responses=[
+            [_route(0, EAST_COORDINATES, duration=700)]
+        ],
+    )
+
+    assert len(result.candidates) == 2
+    assert result.timings.mapbox_request_count == 2
+    assert len(routing.waypoint_calls) == 1
+
+
+def test_relaxed_third_route_is_bounded_by_existing_fallback() -> None:
+    result, routing, _, _ = _generate(
+        [
+            _route(0, DIRECT_COORDINATES, duration=600),
+            _route(1, EAST_COORDINATES, duration=700),
+        ],
+        waypoints=[_waypoint(10)],
+        waypoint_responses=[
+            [_route(0, WEST_COORDINATES, duration=1000)]
+        ],
+    )
+
+    assert len(result.candidates) == 3
+    assert result.candidates[2].duration_seconds == 1000
+    assert result.reason is (
+        CandidateGenerationReason.RELAXED_DETOUR_ALTERNATIVE_ADDED
+    )
+    assert result.timings.mapbox_request_count == 2
+    assert len(routing.waypoint_calls) == 1
+    assert result.timings.relaxed_fallback_activated is True
 
 
 def test_historical_waypoint_provenance_is_preserved() -> None:

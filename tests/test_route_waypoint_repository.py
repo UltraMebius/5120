@@ -21,6 +21,7 @@ def _row():
         "distance_from_destination_meters": 500.0,
         "distance_from_direct_route_meters": 100.0,
         "estimated_geometric_detour_meters": 50.0,
+        "projected_route_progress": 0.5,
         "snapshot_window_start": NOW,
         "snapshot_window_end": NOW,
         "snapshot_calculated_at": NOW,
@@ -73,6 +74,8 @@ def test_corridor_waypoint_lookup_uses_one_bounded_sql_execution() -> None:
     assert parameters["search_corridor_radius_m"] == 600.0
     assert parameters["minimum_endpoint_distance_m"] == 150.0
     assert parameters["minimum_route_offset_m"] == 35.0
+    assert parameters["minimum_route_progress"] == 0.10
+    assert parameters["maximum_route_progress"] == 0.90
     assert parameters["geometric_detour_multiplier"] == 1.5
     assert batch.sql_execution_count == 1
     assert len(batch.evidence) == 1
@@ -80,3 +83,5 @@ def test_corridor_waypoint_lookup_uses_one_bounded_sql_execution() -> None:
     assert evidence.sensor_flow.location_id == 100
     assert evidence.sensor_flow.live_pedestrian_movements_per_minute == 10.0
     assert evidence.sensor_flow.historical_typical_movements_per_minute == 10.0
+    assert evidence.projected_route_progress == 0.5
+    assert "ST_LineLocatePoint" in sql

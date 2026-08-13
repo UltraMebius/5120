@@ -193,6 +193,169 @@ def test_multiple_waypoint_legs_preserve_steps_in_leg_order() -> None:
     ]
 
 
+def _mapbox_step(
+    instruction: str,
+    maneuver_type: str | None,
+    *,
+    distance: float = 100,
+) -> dict[str, object]:
+    maneuver: dict[str, object] = {
+        "instruction": instruction,
+        "location": [144.965, -37.814],
+    }
+    if maneuver_type is not None:
+        maneuver["type"] = maneuver_type
+    return {
+        "distance": distance,
+        "duration": 60,
+        "maneuver": maneuver,
+    }
+
+
+def test_two_leg_route_removes_intermediate_arrival_and_preserves_totals() -> None:
+    route = _route(distance=1750, duration=1260)
+    original_geometry = route["geometry"]
+    route["legs"] = [
+        {
+            "steps": [
+                _mapbox_step("Walk to the waypoint", "depart"),
+                _mapbox_step(
+                    "You have arrived at your destination.",
+                    "arrive",
+                    distance=0,
+                ),
+            ]
+        },
+        {
+            "steps": [
+                _mapbox_step("Continue toward the destination", "turn"),
+                _mapbox_step(
+                    "You have arrived at your destination.",
+                    "arrive",
+                    distance=0,
+                ),
+            ]
+        },
+    ]
+
+    normalized = WalkingRoutingService.normalize_routes(
+        {"code": "Ok", "routes": [route]}
+    )[0]
+
+    assert [step.instruction for step in normalized.steps] == [
+        "Walk to the waypoint",
+        "Continue toward the destination",
+        "You have arrived at your destination.",
+    ]
+    assert sum(
+        step.instruction == "You have arrived at your destination."
+        for step in normalized.steps
+    ) == 1
+    assert normalized.distanceMeters == 1750
+    assert normalized.durationSeconds == 1260
+    assert normalized.geometry.type == original_geometry["type"]
+    assert normalized.geometry.coordinates == [
+        tuple(coordinate) for coordinate in original_geometry["coordinates"]
+    ]
+
+
+def test_three_leg_route_removes_both_intermediate_arrivals() -> None:
+    route = _route()
+    route["legs"] = [
+        {
+            "steps": [
+                _mapbox_step("Walk to waypoint A", "depart"),
+                _mapbox_step("Arrive at waypoint A", "arrive", distance=0),
+            ]
+        },
+        {
+            "steps": [
+                _mapbox_step("Walk to waypoint B", "depart"),
+                _mapbox_step("Arrive at waypoint B", "arrive", distance=0),
+            ]
+        },
+        {
+            "steps": [
+                _mapbox_step("Walk to the destination", "depart"),
+                _mapbox_step(
+                    "You have arrived at your destination.",
+                    "arrive",
+                    distance=0,
+                ),
+            ]
+        },
+    ]
+
+    normalized = WalkingRoutingService.normalize_routes(
+        {"code": "Ok", "routes": [route]}
+    )[0]
+
+    assert [step.instruction for step in normalized.steps] == [
+        "Walk to waypoint A",
+        "Walk to waypoint B",
+        "Walk to the destination",
+        "You have arrived at your destination.",
+    ]
+
+
+def test_single_leg_route_preserves_final_arrival_instruction() -> None:
+    route = _route()
+    route["legs"] = [
+        {
+            "steps": [
+                _mapbox_step("Walk to the destination", "depart"),
+                _mapbox_step(
+                    "You have arrived at your destination.",
+                    "arrive",
+                    distance=0,
+                ),
+            ]
+        }
+    ]
+
+    normalized = WalkingRoutingService.normalize_routes(
+        {"code": "Ok", "routes": [route]}
+    )[0]
+
+    assert normalized.steps[-1].instruction == (
+        "You have arrived at your destination."
+    )
+
+
+def test_intermediate_arrival_instruction_fallback_applies_without_type() -> None:
+    route = _route()
+    route["legs"] = [
+        {
+            "steps": [
+                _mapbox_step("Walk to the waypoint", "depart"),
+                _mapbox_step(
+                    "You have arrived at your destination.",
+                    None,
+                    distance=0,
+                ),
+            ]
+        },
+        {
+            "steps": [
+                _mapbox_step("Continue to the destination", "depart"),
+                _mapbox_step(
+                    "You have arrived at your destination.",
+                    None,
+                    distance=0,
+                ),
+            ]
+        },
+    ]
+
+    normalized = WalkingRoutingService.normalize_routes(
+        {"code": "Ok", "routes": [route]}
+    )[0]
+
+    assert [step.instruction for step in normalized.steps].count(
+        "You have arrived at your destination."
+    ) == 1
+
+
 class RecordingClient:
     def __init__(self):
         self.two_point_calls = []

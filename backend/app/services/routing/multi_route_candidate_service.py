@@ -10,11 +10,14 @@ from ...schemas.routes import WalkingRouteOption
 from .mapbox_directions_client import MapboxDirectionsError
 from .route_candidate_config import (
     MAXIMUM_MAPBOX_REQUESTS,
-    MAXIMUM_RETAINED_CANDIDATES,
+    MAXIMUM_MEANINGFUL_ROUTES,
     MAXIMUM_ROUTE_DURATION_MULTIPLIER,
     MAXIMUM_WAYPOINT_ATTEMPTS,
+    MINIMUM_MEANINGFUL_ROUTES,
     MINIMUM_JOURNEY_FOR_WAYPOINT_M,
-    TARGET_MEANINGFUL_CANDIDATE_COUNT,
+    RELAXED_ROUTE_ADDITIONAL_SECONDS,
+    RELAXED_ROUTE_DURATION_MULTIPLIER,
+    TARGET_MEANINGFUL_ROUTES,
 )
 from .route_candidate_models import (
     CandidateGenerationReason,
@@ -87,8 +90,34 @@ def is_within_detour_limit(
 ) -> bool:
     """Apply the inclusive 1.5x practical-duration boundary."""
 
-    return candidate_duration_seconds <= (
-        fastest_duration_seconds * MAXIMUM_ROUTE_DURATION_MULTIPLIER
+    return candidate_duration_seconds <= strict_detour_limit_seconds(
+        fastest_duration_seconds
+    )
+
+
+def strict_detour_limit_seconds(fastest_duration_seconds: float) -> float:
+    """Return the unchanged primary 1.5x practical-duration boundary."""
+
+    return fastest_duration_seconds * MAXIMUM_ROUTE_DURATION_MULTIPLIER
+
+
+def relaxed_detour_limit_seconds(fastest_duration_seconds: float) -> float:
+    """Return the bounded fallback duration ceiling."""
+
+    return min(
+        fastest_duration_seconds * RELAXED_ROUTE_DURATION_MULTIPLIER,
+        fastest_duration_seconds + RELAXED_ROUTE_ADDITIONAL_SECONDS,
+    )
+
+
+def is_within_relaxed_detour_limit(
+    candidate_duration_seconds: float,
+    fastest_duration_seconds: float,
+) -> bool:
+    """Apply the inclusive relaxed boundary used only for recovery."""
+
+    return candidate_duration_seconds <= relaxed_detour_limit_seconds(
+        fastest_duration_seconds
     )
 
 
@@ -139,23 +168,17 @@ class MultiRouteCandidateService:
         self,
         candidates: Sequence[RouteCandidate],
         *,
-        fastest_duration_seconds: float,
-    ) -> tuple[list[RouteCandidate], bool, bool]:
-        detour_rejected = any(
-            not is_within_detour_limit(
-                candidate.duration_seconds,
-                fastest_duration_seconds,
-            )
+        maximum_duration_seconds: float,
+    ) -> tuple[list[RouteCandidate], bool, int]:
+        detour_rejected_count = sum(
+            candidate.duration_seconds > maximum_duration_seconds
             for candidate in candidates
         )
         practical = sorted(
             (
                 candidate
                 for candidate in candidates
-                if is_within_detour_limit(
-                    candidate.duration_seconds,
-                    fastest_duration_seconds,
-                )
+                if candidate.duration_seconds <= maximum_duration_seconds
             ),
             key=_representative_key,
         )
@@ -172,17 +195,17 @@ class MultiRouteCandidateService:
                 similarity_rejected = True
                 continue
             retained.append(candidate)
-        return retained, similarity_rejected, detour_rejected
+        return retained, similarity_rejected, detour_rejected_count
 
     def _bounded_diverse_pool(
         self,
         candidates: Sequence[RouteCandidate],
     ) -> list[RouteCandidate]:
         remaining = sorted(candidates, key=_representative_key)
-        if len(remaining) <= MAXIMUM_RETAINED_CANDIDATES:
+        if len(remaining) <= MAXIMUM_MEANINGFUL_ROUTES:
             return remaining
         selected = [remaining.pop(0)]
-        while remaining and len(selected) < MAXIMUM_RETAINED_CANDIDATES:
+        while remaining and len(selected) < MAXIMUM_MEANINGFUL_ROUTES:
             scored: list[tuple[float, tuple[float, float, int], RouteCandidate]] = []
             for candidate in remaining:
                 maximum_overlap = max(
@@ -282,38 +305,91 @@ class MultiRouteCandidateService:
         fastest_duration = min(
             candidate.duration_seconds for candidate in initial_candidates
         )
+        strict_detour_limit = strict_detour_limit_seconds(fastest_duration)
+        relaxed_detour_limit = relaxed_detour_limit_seconds(fastest_duration)
 
         distinctness_started = perf_counter()
-        retained, similarity_rejected, detour_rejected = (
+        retained, similarity_rejected, rejected_strict_detour_count = (
             self._deduplicate_and_filter(
                 initial_candidates,
-                fastest_duration_seconds=fastest_duration,
+                maximum_duration_seconds=strict_detour_limit,
             )
         )
+        strict_candidate_count = len(retained)
+        rejected_relaxed_detour_count = sum(
+            candidate.duration_seconds > relaxed_detour_limit
+            for candidate in initial_candidates
+        )
+        relaxed_fallback_activated = (
+            len(retained) < MINIMUM_MEANINGFUL_ROUTES
+        )
+        relaxed_alternative_added = False
+
+        if len(retained) < TARGET_MEANINGFUL_ROUTES:
+            relaxed_initial_candidates = sorted(
+                (
+                    candidate
+                    for candidate in initial_candidates
+                    if strict_detour_limit
+                    < candidate.duration_seconds
+                    <= relaxed_detour_limit
+                ),
+                key=_representative_key,
+            )
+            for candidate in relaxed_initial_candidates:
+                if len(retained) >= TARGET_MEANINGFUL_ROUTES:
+                    break
+                if any(
+                    self.distinctness_service.compare(
+                        candidate.geometry,
+                        existing.geometry,
+                    ).too_similar
+                    for existing in retained
+                ):
+                    similarity_rejected = True
+                    continue
+                retained.append(candidate)
+                relaxed_fallback_activated = True
+                relaxed_alternative_added = True
+
         candidate_distinctness_ms = (
             perf_counter() - distinctness_started
         ) * 1000.0
 
         waypoint_selection_ms = 0.0
         waypoint_mapbox_ms = 0.0
-        reason = CandidateGenerationReason.MULTIPLE_MAPBOX_ROUTES
-        if len(retained) < TARGET_MEANINGFUL_CANDIDATE_COUNT:
+        third_route_attempted = False
+        attempted_waypoint_ids: set[int] = set()
+        reason = (
+            CandidateGenerationReason.RELAXED_DETOUR_ALTERNATIVE_ADDED
+            if relaxed_alternative_added
+            else CandidateGenerationReason.MULTIPLE_MAPBOX_ROUTES
+        )
+        if len(retained) < TARGET_MEANINGFUL_ROUTES:
             journey_distance = haversine_distance_meters(origin, destination)
             if journey_distance < MINIMUM_JOURNEY_FOR_WAYPOINT_M:
                 reason = CandidateGenerationReason.JOURNEY_TOO_SHORT
             else:
                 waypoint_selection_started = perf_counter()
+                available_request_budget = (
+                    MAXIMUM_MAPBOX_REQUESTS - mapbox_request_count
+                )
+                waypoint_attempt_limit = min(
+                    MAXIMUM_WAYPOINT_ATTEMPTS,
+                    TARGET_MEANINGFUL_ROUTES - len(retained),
+                    available_request_budget,
+                )
                 waypoints = self.waypoint_service.select_waypoints(
                     origin=origin,
                     destination=destination,
                     direct_route_geometry=retained[0].geometry,
-                    limit=MAXIMUM_WAYPOINT_ATTEMPTS,
+                    limit=waypoint_attempt_limit,
                 )
                 waypoint_selection_ms = (
                     perf_counter() - waypoint_selection_started
                 ) * 1000.0
-                if not waypoints:
-                    if detour_rejected:
+                if not waypoints and len(retained) < MINIMUM_MEANINGFUL_ROUTES:
+                    if rejected_relaxed_detour_count > 0:
                         reason = CandidateGenerationReason.DETOUR_LIMIT_EXCEEDED
                     elif similarity_rejected:
                         reason = CandidateGenerationReason.ALTERNATIVES_TOO_SIMILAR
@@ -323,10 +399,15 @@ class MultiRouteCandidateService:
                 waypoint_detour_rejected = False
                 for attempt_index, waypoint in enumerate(waypoints):
                     if (
-                        len(retained) >= TARGET_MEANINGFUL_CANDIDATE_COUNT
+                        len(retained) >= TARGET_MEANINGFUL_ROUTES
                         or mapbox_request_count >= MAXIMUM_MAPBOX_REQUESTS
                     ):
                         break
+                    if waypoint.location_id in attempted_waypoint_ids:
+                        continue
+                    attempted_waypoint_ids.add(waypoint.location_id)
+                    if len(retained) >= MINIMUM_MEANINGFUL_ROUTES:
+                        third_route_attempted = True
                     mapbox_request_count += 1
                     waypoint_mapbox_started = perf_counter()
                     try:
@@ -362,10 +443,17 @@ class MultiRouteCandidateService:
                             waypoint=waypoint,
                         )
                         candidate_count_before_filter += 1
-                        if not is_within_detour_limit(
+                        within_strict_detour = is_within_detour_limit(
+                            candidate.duration_seconds,
+                            fastest_duration,
+                        )
+                        if not within_strict_detour:
+                            rejected_strict_detour_count += 1
+                        if not is_within_relaxed_detour_limit(
                             candidate.duration_seconds,
                             fastest_duration,
                         ):
+                            rejected_relaxed_detour_count += 1
                             waypoint_detour_rejected = True
                             continue
                         comparison_started = perf_counter()
@@ -383,10 +471,21 @@ class MultiRouteCandidateService:
                             waypoint_similarity_rejected = True
                             continue
                         retained.append(candidate)
-                        reason = CandidateGenerationReason.WAYPOINT_ALTERNATIVE_ADDED
+                        if within_strict_detour:
+                            reason = (
+                                CandidateGenerationReason
+                                .WAYPOINT_ALTERNATIVE_ADDED
+                            )
+                        else:
+                            relaxed_fallback_activated = True
+                            relaxed_alternative_added = True
+                            reason = (
+                                CandidateGenerationReason
+                                .RELAXED_DETOUR_ALTERNATIVE_ADDED
+                            )
                         break
 
-                if len(retained) < TARGET_MEANINGFUL_CANDIDATE_COUNT:
+                if len(retained) < MINIMUM_MEANINGFUL_ROUTES:
                     if waypoint_detour_rejected:
                         reason = CandidateGenerationReason.DETOUR_LIMIT_EXCEEDED
                     elif waypoint_similarity_rejected or similarity_rejected:
@@ -395,9 +494,10 @@ class MultiRouteCandidateService:
                         reason = (
                             CandidateGenerationReason.ONLY_ONE_MEANINGFUL_CORRIDOR
                         )
-        elif detour_rejected and len(retained) == 1:
-            reason = CandidateGenerationReason.DETOUR_LIMIT_EXCEEDED
 
+        relaxed_candidate_count = (
+            len(retained) if relaxed_fallback_activated else 0
+        )
         bounding_started = perf_counter()
         retained = self._bounded_diverse_pool(retained)
         candidate_distinctness_ms += (
@@ -421,6 +521,22 @@ class MultiRouteCandidateService:
             candidate_count_before_filter=candidate_count_before_filter,
             candidate_count_after_filter=len(evaluated_candidates),
             flow_sql_execution_count=flow_timings.sql_execution_count,
+            strict_detour_limit_seconds=strict_detour_limit,
+            relaxed_detour_limit_seconds=relaxed_detour_limit,
+            strict_candidate_count=strict_candidate_count,
+            relaxed_candidate_count=relaxed_candidate_count,
+            rejected_strict_detour_count=rejected_strict_detour_count,
+            rejected_relaxed_detour_count=rejected_relaxed_detour_count,
+            relaxed_fallback_activated=relaxed_fallback_activated,
+            target_route_count=TARGET_MEANINGFUL_ROUTES,
+            final_route_count=len(evaluated_candidates),
+            third_route_attempted=third_route_attempted,
+            third_route_added=(
+                len(evaluated_candidates) >= TARGET_MEANINGFUL_ROUTES
+            ),
+            remaining_request_budget=(
+                MAXIMUM_MAPBOX_REQUESTS - mapbox_request_count
+            ),
         )
         _LOGGER.info(
             "multi_route_candidates mapbox_initial_ms=%.3f "
@@ -428,7 +544,15 @@ class MultiRouteCandidateService:
             "waypoint_mapbox_ms=%.3f sampling_ms=%.3f "
             "flow_batch_db_ms=%.3f flow_aggregation_ms=%.3f total_ms=%.3f "
             "mapbox_request_count=%d candidate_count_before_filter=%d "
-            "candidate_count_after_filter=%d flow_sql_execution_count=%d",
+            "candidate_count_after_filter=%d flow_sql_execution_count=%d "
+            "strict_detour_limit_seconds=%.3f "
+            "relaxed_detour_limit_seconds=%.3f strict_candidate_count=%d "
+            "relaxed_candidate_count=%d rejected_strict_detour_count=%d "
+            "rejected_relaxed_detour_count=%d "
+            "relaxed_fallback_activated=%s target_route_count=%d "
+            "final_route_count=%d third_route_attempted=%s "
+            "third_route_added=%s remaining_request_budget=%d "
+            "generation_reason=%s",
             timings.mapbox_initial_ms,
             timings.candidate_distinctness_ms,
             timings.waypoint_selection_ms,
@@ -441,6 +565,19 @@ class MultiRouteCandidateService:
             timings.candidate_count_before_filter,
             timings.candidate_count_after_filter,
             timings.flow_sql_execution_count,
+            timings.strict_detour_limit_seconds,
+            timings.relaxed_detour_limit_seconds,
+            timings.strict_candidate_count,
+            timings.relaxed_candidate_count,
+            timings.rejected_strict_detour_count,
+            timings.rejected_relaxed_detour_count,
+            timings.relaxed_fallback_activated,
+            timings.target_route_count,
+            timings.final_route_count,
+            timings.third_route_attempted,
+            timings.third_route_added,
+            timings.remaining_request_budget,
+            reason.value,
         )
         return MultiRouteCandidateResult(
             candidates=evaluated_candidates,

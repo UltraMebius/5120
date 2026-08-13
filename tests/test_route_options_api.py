@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 from fastapi.testclient import TestClient
 import pytest
 
@@ -233,6 +235,34 @@ def test_options_api_preserves_route_and_source_separated_flow_contract() -> Non
     assert route["typicalPedestrianMovementsPerMinute"] == 18.0
     assert route["livePedestrianFlow"]["p75MovementsPerMinute"] == 20.0
     assert route["historicalPedestrianFlow"]["p75MovementsPerMinute"] == 30.0
+
+
+@pytest.mark.parametrize(
+    ("candidate_source", "expected_public_reason"),
+    [
+        (RouteCandidateSource.MAPBOX_ALTERNATIVE, "MULTIPLE_MAPBOX_ROUTES"),
+        (RouteCandidateSource.FLOW_WAYPOINT, "WAYPOINT_ALTERNATIVE_ADDED"),
+    ],
+)
+def test_relaxed_internal_reason_keeps_existing_frontend_values(
+    candidate_source,
+    expected_public_reason,
+) -> None:
+    alternative = replace(
+        _candidate(1, duration=1000),
+        candidate_source=candidate_source,
+    )
+
+    response, _, _ = _post(
+        [_candidate(0, duration=600), alternative],
+        reason=(
+            CandidateGenerationReason.RELAXED_DETOUR_ALTERNATIVE_ADDED
+        ),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["generationReason"] == expected_public_reason
+    assert response.json()["generationReason"] != "DETOUR_LIMIT_EXCEEDED"
 
 
 def test_options_api_serializes_historical_common_basis() -> None:

@@ -35,6 +35,10 @@ from ..services.routing.route_crowd_ranking_service import (
 from ..services.routing.multi_route_candidate_service import (
     MultiRouteCandidateService,
 )
+from ..services.routing.route_candidate_models import (
+    CandidateGenerationReason,
+    RouteCandidateSource,
+)
 from ..services.routing.route_option_selection_service import (
     RouteOptionSelectionError,
     RouteOptionSelectionResult,
@@ -217,9 +221,22 @@ def _public_route_options(
                 balancedScore=selected.balanced_score,
             )
         )
+    generation_reason = selection.generation_reason
+    if generation_reason is (
+        CandidateGenerationReason.RELAXED_DETOUR_ALTERNATIVE_ADDED
+    ):
+        generation_reason = (
+            CandidateGenerationReason.WAYPOINT_ALTERNATIVE_ADDED
+            if any(
+                route.candidate.candidate_source
+                is RouteCandidateSource.FLOW_WAYPOINT
+                for route in selection.routes
+            )
+            else CandidateGenerationReason.MULTIPLE_MAPBOX_ROUTES
+        )
     return RouteOptionsResponse(
         comparisonBasis=selection.comparison_basis,
-        generationReason=selection.generation_reason,
+        generationReason=generation_reason,
         routes=routes,
     )
 

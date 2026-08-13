@@ -65,13 +65,29 @@ def _normalize_geometry(value: object) -> GeoJsonLineString | None:
     return GeoJsonLineString(coordinates=coordinates)
 
 
+def _is_arrival_maneuver(maneuver: Mapping[str, Any]) -> bool:
+    maneuver_type = maneuver.get("type")
+    if isinstance(maneuver_type, str):
+        return maneuver_type.strip().casefold() == "arrive"
+
+    instruction = maneuver.get("instruction")
+    if not isinstance(instruction, str):
+        return False
+    normalized_instruction = instruction.strip().casefold().rstrip(".! ")
+    return normalized_instruction in {
+        "you have arrived at your destination",
+        "you have arrived at your waypoint",
+    }
+
+
 def _normalize_steps(route: Mapping[str, Any]) -> list[WalkingRouteStep]:
     raw_legs = route.get("legs")
     if not isinstance(raw_legs, list):
         return []
 
     normalized: list[WalkingRouteStep] = []
-    for raw_leg in raw_legs:
+    final_leg_index = len(raw_legs) - 1
+    for leg_index, raw_leg in enumerate(raw_legs):
         if not isinstance(raw_leg, Mapping):
             continue
         raw_steps = raw_leg.get("steps")
@@ -87,6 +103,11 @@ def _normalize_steps(route: Mapping[str, Any]) -> list[WalkingRouteStep]:
                 distance is None
                 or duration is None
                 or not isinstance(maneuver, Mapping)
+            ):
+                continue
+            if (
+                leg_index < final_leg_index
+                and _is_arrival_maneuver(maneuver)
             ):
                 continue
             instruction = maneuver.get("instruction")
