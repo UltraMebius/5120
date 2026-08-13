@@ -79,8 +79,23 @@ def main(argv: list[str] | None = None) -> int:
             f"{_format(result.source_observation_maximum)}"
         )
         print(
-            "Latest source timestamp before window end: "
-            f"{_format(result.snapshot.source_latest_datetime)}"
+            "Latest valid source observation: "
+            f"{_format(result.source_observation_maximum)}"
+        )
+        print(f"Source lag: {result.source_lag_seconds:.2f} seconds")
+        print(
+            "Selected complete current window: "
+            f"[{result.selected_window_start.isoformat()}, "
+            f"{result.selected_window_end.isoformat()})"
+        )
+        print(
+            "Selected window global minutes: "
+            f"{result.selected_window_distinct_minutes}/15"
+        )
+        print(
+            "Window search: "
+            f"complete considered={result.complete_windows_considered}; "
+            f"incomplete skipped={result.incomplete_windows_skipped}"
         )
         print(
             "Source freshness: "

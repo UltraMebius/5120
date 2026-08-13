@@ -51,23 +51,52 @@ def calculate_windows(
     *,
     timezone_name: str = SETTINGS.app_timezone,
     window_minutes: int = 15,
+    current_window_start: datetime | None = None,
+    current_window_end: datetime | None = None,
 ) -> CurrentWindows:
     if as_of.tzinfo is None or as_of.utcoffset() is None:
         raise ValueError("as_of must be timezone-aware")
     if window_minutes <= 0 or 60 % window_minutes:
         raise ValueError("window_minutes must be a positive divisor of 60")
     local = as_of.astimezone(ZoneInfo(timezone_name))
-    current_end_local = local.replace(
-        minute=(local.minute // window_minutes) * window_minutes,
-        second=0,
-        microsecond=0,
-    )
-    current_end = current_end_local.astimezone(timezone.utc)
+    if (current_window_start is None) != (current_window_end is None):
+        raise ValueError("current window start and end must be provided together")
+    if current_window_start is None:
+        current_end_local = local.replace(
+            minute=(local.minute // window_minutes) * window_minutes,
+            second=0,
+            microsecond=0,
+        )
+        current_end = current_end_local.astimezone(timezone.utc)
+        current_start = current_end - timedelta(minutes=window_minutes)
+    else:
+        for value, name in (
+            (current_window_start, "current_window_start"),
+            (current_window_end, "current_window_end"),
+        ):
+            if value.tzinfo is None or value.utcoffset() is None:
+                raise ValueError(f"{name} must be timezone-aware")
+            local_boundary = value.astimezone(ZoneInfo(timezone_name))
+            if (
+                local_boundary.minute % window_minutes
+                or local_boundary.second
+                or local_boundary.microsecond
+            ):
+                raise ValueError(
+                    "current window boundaries must use fixed quarter-hour "
+                    "alignment"
+                )
+        current_start = current_window_start.astimezone(timezone.utc)
+        current_end = current_window_end.astimezone(timezone.utc)
+        if current_end - current_start != timedelta(minutes=window_minutes):
+            raise ValueError(
+                "current window must contain exactly fifteen elapsed minutes"
+            )
     comparison_end_local = local.replace(minute=0, second=0, microsecond=0)
     comparison_end = comparison_end_local.astimezone(timezone.utc)
     return CurrentWindows(
         as_of=as_of,
-        current_start=current_end - timedelta(minutes=window_minutes),
+        current_start=current_start,
         current_end=current_end,
         comparison_start=comparison_end - timedelta(hours=1),
         comparison_end=comparison_end,
@@ -130,11 +159,15 @@ class CurrentActivityService:
         as_of: datetime,
         source_latest_datetime: datetime | None,
         calculated_at: datetime | None = None,
+        current_window_start: datetime | None = None,
+        current_window_end: datetime | None = None,
     ) -> CurrentActivityBuild:
         windows = calculate_windows(
             as_of,
             timezone_name=self.timezone_name,
             window_minutes=self.window_minutes,
+            current_window_start=current_window_start,
+            current_window_end=current_window_end,
         )
         calculated_at = calculated_at or datetime.now(timezone.utc)
         if calculated_at.tzinfo is None or calculated_at.utcoffset() is None:
