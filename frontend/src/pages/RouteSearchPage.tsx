@@ -5,8 +5,8 @@ import AppHeader from "../components/layout/AppHeader";
 import MapboxMap from "../components/map/MapboxMap";
 import RouteSearchForm from "../components/route/RouteSearchForm";
 import { useJourney } from "../context/JourneyContext";
-import { findWalkingRoutes } from "../services/api";
-import type { WalkingRouteSearchRequest } from "../types/route";
+import { fetchRouteOptions, RouteOptionsApiError } from "../services/api";
+import type { RouteOptionsSearchRequest } from "../types/routeOptions";
 
 function RouteSearchPage() {
   const navigate = useNavigate();
@@ -14,17 +14,22 @@ function RouteSearchPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleSearch(request: WalkingRouteSearchRequest) {
+  async function handleSearch(request: RouteOptionsSearchRequest) {
     setIsLoading(true);
     setError(null);
 
     try {
-      const result = await findWalkingRoutes(request);
-      journey.setSearchResults(request, result);
+      const result = await fetchRouteOptions(request);
+      journey.setRouteOptions(request, result);
       navigate("/routes/options");
-    } catch {
-      console.error("Unable to load walking routes.");
-      setError("Walking routes could not be loaded. Please try again.");
+    } catch (requestError: unknown) {
+      console.error("Unable to load route options.");
+      setError(
+        requestError instanceof RouteOptionsApiError &&
+          requestError.reason === "ROUTING_UNAVAILABLE"
+          ? "Walking routes are currently unavailable. Please try again."
+          : "Unable to load route options right now. Please try again.",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -38,8 +43,8 @@ function RouteSearchPage() {
           <p className="eyebrow">Melbourne CBD · Walking</p>
           <h1>Find a calmer way there</h1>
           <p>
-            Choose where you&apos;re going and compare walking routes using your
-            preferred crowd tolerance.
+            Choose where you&apos;re starting and going, then compare walking
+            routes using pedestrian activity estimates.
           </p>
         </section>
 
@@ -54,7 +59,6 @@ function RouteSearchPage() {
         <RouteSearchForm
           initialDestination={journey.destination}
           initialOrigin={journey.origin}
-          initialPreference={journey.preference}
           isLoading={isLoading}
           onDraftLocationChange={journey.setDraftLocation}
           onSearch={handleSearch}

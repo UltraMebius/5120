@@ -16,6 +16,18 @@ import type {
   FrontendCrowdLevel,
   InternalCrowdLevel,
 } from "../types/crowd";
+import type {
+  CandidateGenerationReason,
+  CandidateSource,
+  ComparisonBasis,
+  ComparisonPedestrianFlow,
+  PedestrianFlowEvidence,
+  RelativePedestrianActivity,
+  RouteOption,
+  RouteOptionsResponse,
+  RouteOptionsSearchRequest,
+  RouteRole,
+} from "../types/routeOptions";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -405,6 +417,270 @@ export async function findWalkingRoutes(
     preference: body.preference,
     rankingStatus: body.rankingStatus,
     recommendedRouteId,
+    routes: parsedRoutes,
+  };
+}
+
+function isComparisonBasis(value: unknown): value is ComparisonBasis {
+  return ["LIVE", "HISTORICAL_ESTIMATE", "UNKNOWN"].includes(
+    value as string,
+  );
+}
+
+function isCandidateGenerationReason(
+  value: unknown,
+): value is CandidateGenerationReason {
+  return [
+    "MULTIPLE_MAPBOX_ROUTES",
+    "WAYPOINT_ALTERNATIVE_ADDED",
+    "ONLY_ONE_MEANINGFUL_CORRIDOR",
+    "NO_VALID_WAYPOINT",
+    "ALTERNATIVES_TOO_SIMILAR",
+    "DETOUR_LIMIT_EXCEEDED",
+    "JOURNEY_TOO_SHORT",
+  ].includes(value as string);
+}
+
+function isCandidateSource(value: unknown): value is CandidateSource {
+  return ["DIRECT", "MAPBOX_ALTERNATIVE", "FLOW_WAYPOINT"].includes(
+    value as string,
+  );
+}
+
+function isRouteRole(value: unknown): value is RouteRole {
+  return ["CALMEST", "FASTEST", "BALANCED"].includes(value as string);
+}
+
+function isRelativePedestrianActivity(
+  value: unknown,
+): value is RelativePedestrianActivity {
+  return ["LOWEST", "MIDDLE", "HIGHEST", "UNKNOWN"].includes(
+    value as string,
+  );
+}
+
+function parsePedestrianFlowEvidence(
+  value: unknown,
+): PedestrianFlowEvidence | null {
+  if (
+    !isRecord(value) ||
+    !isNullableNonNegativeFiniteNumber(value.medianMovementsPerMinute) ||
+    !isNullableNonNegativeFiniteNumber(value.p75MovementsPerMinute) ||
+    !isNullableNonNegativeFiniteNumber(value.maximumMovementsPerMinute) ||
+    !isPercentage(value.coveragePct)
+  ) {
+    return null;
+  }
+
+  return {
+    coveragePct: value.coveragePct,
+    maximumMovementsPerMinute: value.maximumMovementsPerMinute,
+    medianMovementsPerMinute: value.medianMovementsPerMinute,
+    p75MovementsPerMinute: value.p75MovementsPerMinute,
+  };
+}
+
+function parseComparisonPedestrianFlow(
+  value: unknown,
+): ComparisonPedestrianFlow | null {
+  if (
+    !isRecord(value) ||
+    !isComparisonBasis(value.basis) ||
+    !isNullableNonNegativeFiniteNumber(value.typicalMovementsPerMinute) ||
+    !isNullableNonNegativeFiniteNumber(value.p75MovementsPerMinute) ||
+    !isNullableNonNegativeFiniteNumber(value.maximumMovementsPerMinute) ||
+    !isNullablePercentage(value.coveragePct)
+  ) {
+    return null;
+  }
+
+  return {
+    basis: value.basis,
+    coveragePct: value.coveragePct,
+    maximumMovementsPerMinute: value.maximumMovementsPerMinute,
+    p75MovementsPerMinute: value.p75MovementsPerMinute,
+    typicalMovementsPerMinute: value.typicalMovementsPerMinute,
+  };
+}
+
+function parseRouteOptionStep(value: unknown): WalkingRouteStep | null {
+  if (
+    !isRecord(value) ||
+    typeof value.instruction !== "string" ||
+    !isNonNegativeFiniteNumber(value.distanceMeters) ||
+    !isNonNegativeFiniteNumber(value.durationSeconds)
+  ) {
+    return null;
+  }
+
+  const maneuverLocation =
+    value.maneuverLocation === null
+      ? null
+      : parseCoordinatePair(value.maneuverLocation);
+  if (value.maneuverLocation !== null && maneuverLocation === null) {
+    return null;
+  }
+
+  return {
+    distanceMeters: value.distanceMeters,
+    durationSeconds: value.durationSeconds,
+    instruction: value.instruction,
+    maneuverLocation,
+  };
+}
+
+function parseRouteOption(value: unknown): RouteOption | null {
+  if (
+    !isRecord(value) ||
+    typeof value.routeId !== "string" ||
+    !value.routeId.trim() ||
+    !isNonNegativeInteger(value.routeIndex) ||
+    !isCandidateSource(value.candidateSource) ||
+    !isNonNegativeFiniteNumber(value.distanceMeters) ||
+    !isNonNegativeFiniteNumber(value.durationSeconds) ||
+    !Array.isArray(value.steps) ||
+    !Array.isArray(value.roleBadges) ||
+    value.roleBadges.length === 0 ||
+    !value.roleBadges.every(isRouteRole) ||
+    new Set(value.roleBadges).size !== value.roleBadges.length ||
+    !isRelativePedestrianActivity(value.relativePedestrianActivity) ||
+    !isNullableNonNegativeFiniteNumber(
+      value.typicalPedestrianMovementsPerMinute,
+    ) ||
+    !(
+      value.balancedScore === null ||
+      (typeof value.balancedScore === "number" &&
+        Number.isFinite(value.balancedScore) &&
+        value.balancedScore >= 0 &&
+        value.balancedScore <= 1)
+    )
+  ) {
+    return null;
+  }
+
+  const geometry = parseGeometry(value.geometry);
+  const steps = value.steps.map(parseRouteOptionStep);
+  const comparisonPedestrianFlow = parseComparisonPedestrianFlow(
+    value.comparisonPedestrianFlow,
+  );
+  const livePedestrianFlow = parsePedestrianFlowEvidence(
+    value.livePedestrianFlow,
+  );
+  const historicalPedestrianFlow = parsePedestrianFlowEvidence(
+    value.historicalPedestrianFlow,
+  );
+
+  if (
+    !geometry ||
+    steps.some((step) => step === null) ||
+    !comparisonPedestrianFlow ||
+    !livePedestrianFlow ||
+    !historicalPedestrianFlow ||
+    value.typicalPedestrianMovementsPerMinute !==
+      comparisonPedestrianFlow.typicalMovementsPerMinute
+  ) {
+    return null;
+  }
+
+  return {
+    balancedScore: value.balancedScore,
+    candidateSource: value.candidateSource,
+    comparisonPedestrianFlow,
+    distanceMeters: value.distanceMeters,
+    durationSeconds: value.durationSeconds,
+    geometry,
+    historicalPedestrianFlow,
+    livePedestrianFlow,
+    relativePedestrianActivity: value.relativePedestrianActivity,
+    roleBadges: value.roleBadges as RouteRole[],
+    routeId: value.routeId,
+    routeIndex: value.routeIndex,
+    steps: steps as WalkingRouteStep[],
+    typicalPedestrianMovementsPerMinute:
+      value.typicalPedestrianMovementsPerMinute,
+  };
+}
+
+export type RouteOptionsApiErrorReason =
+  | "ROUTING_UNAVAILABLE"
+  | "OPTIONS_UNAVAILABLE";
+
+export class RouteOptionsApiError extends Error {
+  readonly reason: RouteOptionsApiErrorReason;
+
+  constructor(reason: RouteOptionsApiErrorReason) {
+    super("Route options could not be loaded.");
+    this.name = "RouteOptionsApiError";
+    this.reason = reason;
+  }
+}
+
+export async function fetchRouteOptions(
+  request: RouteOptionsSearchRequest,
+): Promise<RouteOptionsResponse> {
+  const response = await fetch(`${APP_CONFIG.apiBaseUrl}/api/v1/routes/options`, {
+    body: JSON.stringify({
+      destination: {
+        longitude: request.destination.longitude,
+        latitude: request.destination.latitude,
+      },
+      origin: {
+        longitude: request.origin.longitude,
+        latitude: request.origin.latitude,
+      },
+    }),
+    headers: { "Content-Type": "application/json" },
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    throw new RouteOptionsApiError(
+      response.status === 502
+        ? "ROUTING_UNAVAILABLE"
+        : "OPTIONS_UNAVAILABLE",
+    );
+  }
+
+  let body: unknown;
+  try {
+    body = (await response.json()) as unknown;
+  } catch {
+    throw new RouteOptionsApiError("OPTIONS_UNAVAILABLE");
+  }
+
+  if (
+    !isRecord(body) ||
+    !isComparisonBasis(body.comparisonBasis) ||
+    !isCandidateGenerationReason(body.generationReason) ||
+    !Array.isArray(body.routes) ||
+    body.routes.length < 1 ||
+    body.routes.length > 3
+  ) {
+    throw new RouteOptionsApiError("OPTIONS_UNAVAILABLE");
+  }
+
+  const routes = body.routes.map(parseRouteOption);
+  if (
+    routes.some((route) => route === null) ||
+    new Set(
+      routes.map((route) => (route as RouteOption).routeId),
+    ).size !== routes.length
+  ) {
+    throw new RouteOptionsApiError("OPTIONS_UNAVAILABLE");
+  }
+
+  const parsedRoutes = routes as RouteOption[];
+  if (
+    parsedRoutes.some(
+      (route) => route.comparisonPedestrianFlow.basis !== body.comparisonBasis,
+    )
+  ) {
+    throw new RouteOptionsApiError("OPTIONS_UNAVAILABLE");
+  }
+
+  return {
+    comparisonBasis: body.comparisonBasis,
+    generationReason: body.generationReason,
     routes: parsedRoutes,
   };
 }

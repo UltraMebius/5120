@@ -4,26 +4,23 @@ import {
   geolocationErrorMessage,
   getCurrentJourneyLocation,
 } from "../../services/geolocation";
-import type { CrowdPreference } from "../../types/crowd";
 import type {
   JourneyLocation,
   MapboxJourneyLocation,
   MapboxSelectedLocation,
-  WalkingRouteSearchRequest,
 } from "../../types/route";
-import CrowdPreferenceSelector from "../crowd/CrowdPreferenceSelector";
+import type { RouteOptionsSearchRequest } from "../../types/routeOptions";
 import LocationSearchField from "./LocationSearchField";
 
 interface RouteSearchFormProps {
   initialDestination?: JourneyLocation | null;
   initialOrigin?: JourneyLocation | null;
-  initialPreference: CrowdPreference;
   isLoading: boolean;
   onDraftLocationChange: (
     field: "destination" | "origin",
     location: JourneyLocation | null,
   ) => void;
-  onSearch: (request: WalkingRouteSearchRequest) => Promise<void>;
+  onSearch: (request: RouteOptionsSearchRequest) => Promise<void>;
 }
 
 interface FormErrors {
@@ -49,7 +46,6 @@ function journeyLocationFromSelection(
 function RouteSearchForm({
   initialDestination,
   initialOrigin,
-  initialPreference,
   isLoading,
   onDraftLocationChange,
   onSearch,
@@ -62,8 +58,6 @@ function RouteSearchForm({
     selectedLocation: initialDestination ?? null,
     text: initialDestination?.label ?? "",
   });
-  const [preference, setPreference] =
-    useState<CrowdPreference>(initialPreference);
   const [errors, setErrors] = useState<FormErrors>({});
   const [locationError, setLocationError] = useState<string | null>(null);
   const [locationStatus, setLocationStatus] = useState<string | null>(null);
@@ -175,7 +169,6 @@ function RouteSearchForm({
     void onSearch({
       destination: destination.selectedLocation,
       origin: origin.selectedLocation,
-      preference,
     }).finally(() => {
       isSubmittingRef.current = false;
     });
@@ -230,11 +223,9 @@ function RouteSearchForm({
         Use your current location or choose a starting point and destination.
       </p>
 
-      <CrowdPreferenceSelector onChange={setPreference} value={preference} />
-
       <p className="crowd-disclaimer">
-        Crowd levels are relative estimates based on pedestrian activity data
-        and should not be treated as medical advice or safety guarantees.
+        Pedestrian activity is an estimate and should not be treated as a
+        medical recommendation or safety guarantee.
       </p>
 
       <button

@@ -1,10 +1,9 @@
-import { Link, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { Navigate, useNavigate } from "react-router-dom";
 
-import CrowdAlertPanel from "../components/crowd/CrowdAlertPanel";
+import { APP_CONFIG } from "../config";
 import RouteMap from "../components/map/RouteMap";
 import { useJourney } from "../context/JourneyContext";
-import { getPreferenceOption } from "../types/crowd";
-import { findLowerStimulationAlternative } from "../utils/findLowerStimulationAlternative";
 import {
   formatWalkingDistance,
   formatWalkingDuration,
@@ -13,49 +12,28 @@ import {
 function NavigationPage() {
   const navigate = useNavigate();
   const journey = useJourney();
+  const [isExiting, setIsExiting] = useState(false);
   const route = journey.selectedRoute;
+  const mapDestination =
+    journey.destination?.source === "MAPBOX" ? journey.destination : null;
 
-  if (!route || !journey.destination) {
-    return (
-      <main className="standalone-state">
-        <div className="empty-state">
-          <span className="empty-state__icon" aria-hidden="true">
-            →
-          </span>
-          <h1>No active journey</h1>
-          <p>Choose a route before starting navigation.</p>
-          <Link className="button button--primary" to="/routes/options">
-            View route options
-          </Link>
-        </div>
-      </main>
-    );
+  if ((!route || !journey.origin || !mapDestination) && !isExiting) {
+    return <Navigate replace to="/routes/search" />;
   }
 
-  const alert = route.initialCrowdAlert;
-  const preference = getPreferenceOption(journey.preference);
-  const alertAcknowledged = journey.acknowledgedAlertRouteIds.includes(
-    route.id,
-  );
-  const alternative =
-    alert.decision === "ALERT"
-      ? findLowerStimulationAlternative(route, journey.routes)
-      : null;
-  const nextStep = route.steps[0] ?? {
-    distanceMeters: 0,
-    durationSeconds: 0,
-    instruction: "Continue along the selected walking route",
-    maneuverLocation: null,
-  };
-  const mapOrigin = journey.origin;
-  const mapDestination =
-    journey.destination.source === "MAPBOX" ? journey.destination : null;
-  const alertLabel =
-    alert.decision === "ALERT"
-      ? "Crowd alert ahead"
-      : alert.decision === "CLEAR"
-        ? "No alert triggered"
-        : null;
+  if (!route || !journey.origin || !mapDestination) {
+    return null;
+  }
+
+  const nextStep = route.steps.find((step) => step.instruction.trim());
+  const instruction =
+    nextStep?.instruction.trim() || "Continue along the selected route";
+
+  function exitJourney() {
+    setIsExiting(true);
+    journey.resetJourney();
+    navigate(APP_CONFIG.homeRoute, { replace: true });
+  }
 
   return (
     <div className="navigation-page">
@@ -70,7 +48,7 @@ function NavigationPage() {
         </button>
         <div>
           <span>Walking to</span>
-          <strong>{journey.destination.label}</strong>
+          <strong>{mapDestination.label}</strong>
         </div>
         <span className="navigation-header__mode" aria-label="Walking route">
           Walk
@@ -80,18 +58,18 @@ function NavigationPage() {
       <main className="navigation-main">
         <RouteMap
           destination={mapDestination}
-          origin={mapOrigin}
-          route={route}
+          origin={journey.origin}
+          routes={[route]}
           variant="navigation"
         />
 
         <section className="maneuver-card" aria-label="Next walking direction">
           <div className="maneuver-card__arrow" aria-hidden="true">
-            ↑
+            →
           </div>
           <div>
-            <span>In {Math.round(nextStep.distanceMeters)} m</span>
-            <h1>{nextStep.instruction}</h1>
+            {nextStep && <span>In {Math.round(nextStep.distanceMeters)} m</span>}
+            <h1>{instruction}</h1>
           </div>
         </section>
 
@@ -105,70 +83,23 @@ function NavigationPage() {
               <strong>{formatWalkingDistance(route.distanceMeters)}</strong>
               <span>route distance</span>
             </div>
-            {alertLabel && (
-              <span
-                className={`navigation-crowd-label navigation-crowd-label--${alert.decision.toLowerCase()}`}
-              >
-                {alertLabel}
-              </span>
-            )}
           </div>
 
           <p className="navigation-limit-note">
-            Route overview. Live location and progress tracking are not enabled.
+            Route guidance overview. Live location and turn-by-turn progress are
+            not enabled.
           </p>
-
-          {journey.statusMessage && (
-            <p className="navigation-message" role="status">
-              {journey.statusMessage}
-            </p>
-          )}
-
-          {alert.decision === "ALERT" && !alertAcknowledged && (
-            <CrowdAlertPanel
-              alert={alert}
-              alternative={alternative}
-              onContinue={() => journey.acknowledgeCrowdAlert(route.id)}
-              onStartAlternative={() => {
-                if (alternative) {
-                  journey.switchToAlternativeRoute(alternative);
-                }
-              }}
-              toleranceLevel={preference.uiLevel}
-            />
-          )}
-
-          {alert.decision === "CLEAR" && (
-            <section
-              aria-label="Crowd status"
-              className="navigation-crowd-state navigation-crowd-state--clear"
-            >
-              <p>
-                No crowd alert is currently triggered from the available data
-                ahead.
-              </p>
-            </section>
-          )}
-
-          {alert.decision === "INSUFFICIENT_DATA" && (
-            <section
-              aria-labelledby="crowd-unavailable-title"
-              className="navigation-crowd-state navigation-crowd-state--unavailable"
-              role="status"
-            >
-              <strong id="crowd-unavailable-title">
-                Crowd information unavailable
-              </strong>
-              <p>
-                There is not enough current pedestrian data ahead to assess
-                your selected crowd preference.
-              </p>
-            </section>
-          )}
 
           <div className="navigation-overview-actions">
             <button
               className="button button--secondary"
+              onClick={exitJourney}
+              type="button"
+            >
+              Exit
+            </button>
+            <button
+              className="button button--primary"
               onClick={() => navigate("/arrival")}
               type="button"
             >

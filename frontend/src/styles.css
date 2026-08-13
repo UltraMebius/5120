@@ -834,6 +834,27 @@ input[aria-invalid="true"] {
   letter-spacing: -0.025em;
 }
 
+.route-role-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.route-role-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 5px 9px;
+  border: 1px solid #b9d8cb;
+  border-radius: 999px;
+  color: #205f4e;
+  background: #eaf6f1;
+  font-size: 0.68rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .route-source-label {
   color: var(--brand);
   font-size: 0.7rem;
@@ -969,6 +990,10 @@ input[aria-invalid="true"] {
 .route-card__actions .button {
   min-width: 0;
   padding-inline: 12px;
+}
+
+.route-card__actions--single {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .route-map {

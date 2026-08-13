@@ -1,8 +1,8 @@
-import { Link, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { Navigate, useNavigate } from "react-router-dom";
 
 import { APP_CONFIG } from "../config";
 import { useJourney } from "../context/JourneyContext";
-import { getPreferenceOption } from "../types/crowd";
 import {
   formatWalkingDistance,
   formatWalkingDuration,
@@ -11,27 +11,19 @@ import {
 function ArrivalPage() {
   const navigate = useNavigate();
   const journey = useJourney();
+  const [isEnding, setIsEnding] = useState(false);
   const route = journey.selectedRoute;
-  const preference = getPreferenceOption(journey.preference);
+
+  if ((!route || !journey.destination) && !isEnding) {
+    return <Navigate replace to="/routes/search" />;
+  }
 
   if (!route || !journey.destination) {
-    return (
-      <main className="standalone-state">
-        <div className="empty-state">
-          <span className="empty-state__icon" aria-hidden="true">
-            ✓
-          </span>
-          <h1>No route selected</h1>
-          <p>Choose a walking route to view its summary.</p>
-          <Link className="button button--primary" to="/routes/search">
-            Find a route
-          </Link>
-        </div>
-      </main>
-    );
+    return null;
   }
 
   function endNavigation() {
+    setIsEnding(true);
     journey.resetJourney();
     navigate(APP_CONFIG.homeRoute, { replace: true });
   }
@@ -40,7 +32,7 @@ function ArrivalPage() {
     <main className="arrival-page">
       <section className="arrival-card">
         <div className="arrival-card__mark" aria-hidden="true">
-          →
+          ✓
         </div>
         <p className="eyebrow">Planned journey</p>
         <h1>Route summary</h1>
@@ -58,8 +50,8 @@ function ArrivalPage() {
             <strong>{formatWalkingDuration(route.durationSeconds)}</strong>
           </div>
           <div>
-            <span>Selected tolerance</span>
-            <strong>{preference.uiLevel}</strong>
+            <span>Route roles</span>
+            <strong>{route.roleBadges.join(" + ")}</strong>
           </div>
         </div>
 

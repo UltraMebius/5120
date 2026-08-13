@@ -1,19 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 
-import {
-  MAPBOX_CONFIG,
-  isMapboxConfigured,
-} from "../../services/mapbox";
+import { MAPBOX_CONFIG, isMapboxConfigured } from "../../services/mapbox";
 import type {
   GeoJsonLineString,
   JourneyLocation,
   MapboxJourneyLocation,
-  WalkingRoute,
 } from "../../types/route";
+import type { RouteOption } from "../../types/routeOptions";
+import { ROUTE_ACTIVITY_COLOURS } from "../../utils/routeOptionPresentation";
 
-const ROUTE_SOURCE_ID = "calmway-walking-route";
-const ROUTE_LAYER_ID = "calmway-walking-route-line";
+const ROUTE_SOURCE_ID = "calmway-walking-routes";
+const ROUTE_LAYER_ID = "calmway-walking-routes-lines";
 const DEFAULT_CENTER: [longitude: number, latitude: number] = [
   144.9631, -37.8136,
 ];
@@ -24,17 +22,25 @@ type RouteCoordinate = [longitude: number, latitude: number];
 interface RouteMapProps {
   destination: MapboxJourneyLocation | null;
   origin: JourneyLocation | null;
-  route: WalkingRoute;
+  routes: RouteOption[];
   variant: RouteMapVariant;
+}
+
+interface RouteFeature {
+  geometry: GeoJsonLineString;
+  properties: {
+    colour: string;
+    routeId: string;
+  };
+  type: "Feature";
 }
 
 interface RouteVisualisation {
   coordinates: RouteCoordinate[];
   destination: RouteCoordinate;
-  feature: {
-    geometry: GeoJsonLineString;
-    properties: Record<string, never>;
-    type: "Feature";
+  featureCollection: {
+    features: RouteFeature[];
+    type: "FeatureCollection";
   };
   fitKey: string;
   origin: RouteCoordinate;
@@ -58,12 +64,11 @@ function isValidCoordinate(value: unknown): value is RouteCoordinate {
   );
 }
 
-function createVisualisation(
+export function createRouteMapVisualisation(
   origin: JourneyLocation | null,
   destination: MapboxJourneyLocation | null,
-  route: WalkingRoute,
+  routes: RouteOption[],
 ): RouteVisualisation | null {
-  const geometry = route.geometry;
   const originCoordinate: unknown = origin
     ? [origin.longitude, origin.latitude]
     : null;
@@ -72,31 +77,42 @@ function createVisualisation(
     : null;
 
   if (
-    geometry?.type !== "LineString" ||
-    !Array.isArray(geometry.coordinates) ||
-    geometry.coordinates.length < 2 ||
-    !geometry.coordinates.every(isValidCoordinate) ||
+    routes.length === 0 ||
     !isValidCoordinate(originCoordinate) ||
-    !isValidCoordinate(destinationCoordinate)
+    !isValidCoordinate(destinationCoordinate) ||
+    routes.some(
+      (route) =>
+        route.geometry.type !== "LineString" ||
+        route.geometry.coordinates.length < 2 ||
+        !route.geometry.coordinates.every(isValidCoordinate),
+    )
   ) {
     return null;
   }
 
-  const coordinates = geometry.coordinates;
+  const features = routes.map<RouteFeature>((route) => ({
+    geometry: route.geometry,
+    properties: {
+      colour: ROUTE_ACTIVITY_COLOURS[route.relativePedestrianActivity],
+      routeId: route.routeId,
+    },
+    type: "Feature",
+  }));
+  const coordinates = routes.flatMap((route) => route.geometry.coordinates);
+
   return {
     coordinates,
     destination: destinationCoordinate,
-    feature: {
-      geometry: {
-        coordinates,
-        type: "LineString",
-      },
-      properties: {},
-      type: "Feature",
-    },
-    fitKey: [route.id, ...coordinates.flat(), ...originCoordinate, ...destinationCoordinate].join(
-      "|",
-    ),
+    featureCollection: { features, type: "FeatureCollection" },
+    fitKey: [
+      ...routes.flatMap((route) => [
+        route.routeId,
+        route.relativePedestrianActivity,
+        ...route.geometry.coordinates.flat(),
+      ]),
+      ...originCoordinate,
+      ...destinationCoordinate,
+    ].join("|"),
     origin: originCoordinate,
   };
 }
@@ -107,7 +123,10 @@ function createMarkerElement(
 ): HTMLDivElement {
   const element = document.createElement("div");
   element.className = `route-map__marker route-map__marker--${kind}`;
-  element.setAttribute("aria-label", `${kind === "origin" ? "Starting point" : "Destination"}: ${locationName}`);
+  element.setAttribute(
+    "aria-label",
+    `${kind === "origin" ? "Starting point" : "Destination"}: ${locationName}`,
+  );
   element.setAttribute("role", "img");
   const label = document.createElement("span");
   label.textContent = kind === "origin" ? "A" : "B";
@@ -115,19 +134,19 @@ function createMarkerElement(
   return element;
 }
 
-function RouteMap({ destination, origin, route, variant }: RouteMapProps) {
+function RouteMap({ destination, origin, routes, variant }: RouteMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const originMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const destinationMarkerRef = useRef<mapboxgl.Marker | null>(null);
-  const lastFittedRouteRef = useRef<string | null>(null);
+  const lastFittedRoutesRef = useRef<string | null>(null);
   const styleReadyRef = useRef(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const [styleRevision, setStyleRevision] = useState(0);
   const configured = isMapboxConfigured();
   const visualisation = useMemo(
-    () => createVisualisation(origin, destination, route),
-    [destination, origin, route],
+    () => createRouteMapVisualisation(origin, destination, routes),
+    [destination, origin, routes],
   );
 
   useEffect(() => {
@@ -144,7 +163,7 @@ function RouteMap({ destination, origin, route, variant }: RouteMapProps) {
     };
     const handleStyleLoad = () => {
       styleReadyRef.current = true;
-      lastFittedRouteRef.current = null;
+      lastFittedRoutesRef.current = null;
       setStyleRevision((revision) => revision + 1);
     };
 
@@ -176,7 +195,7 @@ function RouteMap({ destination, origin, route, variant }: RouteMapProps) {
       destinationMarkerRef.current?.remove();
       originMarkerRef.current = null;
       destinationMarkerRef.current = null;
-      lastFittedRouteRef.current = null;
+      lastFittedRoutesRef.current = null;
       styleReadyRef.current = false;
       map?.remove();
       if (mapRef.current === map) {
@@ -197,10 +216,10 @@ function RouteMap({ destination, origin, route, variant }: RouteMapProps) {
         | undefined;
 
       if (existingSource) {
-        existingSource.setData(visualisation.feature);
+        existingSource.setData(visualisation.featureCollection);
       } else {
         map.addSource(ROUTE_SOURCE_ID, {
-          data: visualisation.feature,
+          data: visualisation.featureCollection,
           type: "geojson",
         });
       }
@@ -213,7 +232,7 @@ function RouteMap({ destination, origin, route, variant }: RouteMapProps) {
             "line-join": "round",
           },
           paint: {
-            "line-color": "#286c5b",
+            "line-color": ["get", "colour"],
             "line-opacity": 0.94,
             "line-width": [
               "interpolate",
@@ -261,7 +280,7 @@ function RouteMap({ destination, origin, route, variant }: RouteMapProps) {
           `Destination: ${destination?.name ?? "Destination"}`,
         );
 
-      if (lastFittedRouteRef.current !== visualisation.fitKey) {
+      if (lastFittedRoutesRef.current !== visualisation.fitKey) {
         const boundsCoordinates = [
           ...visualisation.coordinates,
           visualisation.origin,
@@ -290,27 +309,31 @@ function RouteMap({ destination, origin, route, variant }: RouteMapProps) {
           maxZoom: 16,
           padding,
         });
-        lastFittedRouteRef.current = visualisation.fitKey;
+        lastFittedRoutesRef.current = visualisation.fitKey;
       }
 
       setMapError(null);
     } catch {
-      setMapError("The selected route could not be drawn on the map.");
+      setMapError("The walking routes could not be drawn on the map.");
     }
   }, [destination, origin, styleRevision, variant, visualisation]);
 
   const fallbackMessage = !configured
     ? "The route map is currently unavailable."
     : !visualisation
-      ? "This route cannot currently be displayed on the map. Route details remain available."
+      ? "These routes cannot currently be displayed on the map. Route details remain available."
       : mapError;
+
+  const routeCountLabel = `${routes.length} walking route${
+    routes.length === 1 ? "" : "s"
+  }`;
 
   return (
     <section
       aria-label={
         variant === "navigation"
-          ? `Selected walking route map: ${route.name}`
-          : `Map showing ${route.name}`
+          ? "Selected walking route map"
+          : `Map showing ${routeCountLabel}`
       }
       className={`route-map route-map--${variant}`}
     >

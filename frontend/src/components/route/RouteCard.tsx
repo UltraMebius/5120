@@ -1,90 +1,56 @@
-import CrowdBadge from "../crowd/CrowdBadge";
-import type { FrontendCrowdLevel } from "../../types/crowd";
-import type { WalkingRoute } from "../../types/route";
+import type { ComparisonBasis, RouteOption } from "../../types/routeOptions";
 import {
   formatWalkingDistance,
   formatWalkingDuration,
 } from "../../utils/formatRoute";
+import {
+  formatPedestrianActivity,
+  pedestrianActivityLabel,
+  pedestrianSourceLabel,
+} from "../../utils/routeOptionPresentation";
 
 interface RouteCardProps {
-  isShownOnMap: boolean;
-  isRecommended: boolean;
-  onDepart: (route: WalkingRoute) => void;
-  onShowOnMap: (route: WalkingRoute) => void;
-  route: WalkingRoute;
-  toleranceLevel: FrontendCrowdLevel;
+  comparisonBasis: ComparisonBasis;
+  optionNumber: number;
+  onSelect: (route: RouteOption) => void;
+  route: RouteOption;
 }
 
 function RouteCard({
-  isShownOnMap,
-  isRecommended,
-  onDepart,
-  onShowOnMap,
+  comparisonBasis,
+  optionNumber,
+  onSelect,
   route,
-  toleranceLevel,
 }: RouteCardProps) {
-  const crowdResult =
-    route.preferenceStatus !== "INSUFFICIENT_DATA" &&
-    route.routeCrowdPresentationLevel !== null &&
-    route.p75CrowdExposureScore !== null
-      ? {
-          level: route.routeCrowdPresentationLevel,
-        }
-      : null;
-  const preferenceMessage =
-    route.preferenceStatus === "ABOVE_PREFERENCE"
-      ? `Above your ${toleranceLevel} preference`
-      : `Within your ${toleranceLevel} preference`;
-
   return (
-    <article
-      className={`route-card${isShownOnMap ? " route-card--selected" : ""}${
-        isRecommended ? " route-card--recommended" : ""
-      }`}
-    >
+    <article className="route-card">
       <div className="route-card__topline">
         <div>
           <span className="route-source-label">Walking route</span>
-          <h2>{route.name}</h2>
+          <h2>Option {optionNumber}</h2>
         </div>
-        {isRecommended ? (
-          <span className="route-recommendation-label">
-            CalmWay recommendation
-          </span>
-        ) : route.rank !== null ? (
-          <span className="route-rank-label">Option #{route.rank}</span>
-        ) : (
-          <span className="crowd-unavailable-label">
-            Crowd information unavailable
-          </span>
-        )}
+        <div aria-label="Route roles" className="route-role-badges">
+          {route.roleBadges.map((role) => (
+            <span className="route-role-badge" key={role}>
+              {role}
+            </span>
+          ))}
+        </div>
       </div>
 
       <div className="route-card__crowd-analysis">
-        {crowdResult ? (
-          <>
-            <CrowdBadge level={crowdResult.level} />
-            <span>
-              <strong>Current crowd estimate</strong>
-              <small
-                className={
-                  route.preferenceStatus === "ABOVE_PREFERENCE"
-                    ? "preference-result preference-result--above"
-                    : "preference-result"
-                }
-              >
-                {preferenceMessage}
-              </small>
-            </span>
-          </>
-        ) : (
-          <span>
-            <strong>Crowd information unavailable</strong>
-            <small>
-              You can still view and use this walking route.
-            </small>
-          </span>
-        )}
+        <span>
+          <strong>
+            {formatPedestrianActivity(
+              route.typicalPedestrianMovementsPerMinute,
+              comparisonBasis,
+            )}
+          </strong>
+          <small>
+            {pedestrianActivityLabel(route.relativePedestrianActivity)}
+          </small>
+          <small>{pedestrianSourceLabel(comparisonBasis)}</small>
+        </span>
       </div>
 
       <div className="route-card__stats">
@@ -103,26 +69,18 @@ function RouteCard({
           </span>
           <span>
             <strong>{formatWalkingDuration(route.durationSeconds)}</strong>
-            <small>Estimated time</small>
+            <small>Estimated walking time</small>
           </span>
         </div>
       </div>
 
-      <div className="route-card__actions">
-        <button
-          aria-pressed={isShownOnMap}
-          className="button button--secondary"
-          onClick={() => onShowOnMap(route)}
-          type="button"
-        >
-          {isShownOnMap ? "Shown on map" : "View on map"}
-        </button>
+      <div className="route-card__actions route-card__actions--single">
         <button
           className="button button--primary"
-          onClick={() => onDepart(route)}
+          onClick={() => onSelect(route)}
           type="button"
         >
-          Depart
+          Select route
           <span aria-hidden="true">→</span>
         </button>
       </div>
