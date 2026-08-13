@@ -2,6 +2,7 @@
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from decimal import Decimal
 from enum import Enum
 import logging
 import math
@@ -44,6 +45,11 @@ ROLE_BADGE_ORDER = (
     RouteOptionRole.FASTEST,
     RouteOptionRole.BALANCED,
 )
+
+# The UI rounds its median/typical value to whole movements per minute. Five
+# hundredths is therefore well below display resolution while still preventing
+# tiny full-precision P75 differences from defeating the existing median tie.
+P75_PRACTICAL_EQUALITY_TOLERANCE_MPM = 0.05
 
 
 class RouteOptionSelectionError(RuntimeError):
@@ -133,6 +139,14 @@ def _optional_number_key(value: float | None) -> tuple[bool, float]:
     return value is None, math.inf if value is None else value
 
 
+def _p75_effectively_equal(left: float, right: float) -> bool:
+    """Compare finite P75 values with inclusive decimal boundary semantics."""
+
+    difference = abs(Decimal(str(left)) - Decimal(str(right)))
+    tolerance = Decimal(str(P75_PRACTICAL_EQUALITY_TOLERANCE_MPM))
+    return difference <= tolerance
+
+
 class RouteOptionSelectionService:
     """Assign FASTEST and defensible flow roles without I/O or resampling."""
 
@@ -188,17 +202,24 @@ class RouteOptionSelectionService:
         )
 
     @staticmethod
-    def _calmest_key(
+    def _required_p75(
         candidate: RouteCandidate,
         basis: PedestrianFlowComparisonBasis,
-    ) -> tuple[float, tuple[bool, float], tuple[bool, float], float, float, int, str]:
-        median, p75, maximum, _ = _basis_values(candidate, basis)
+    ) -> float:
+        _, p75, _, _ = _basis_values(candidate, basis)
         if p75 is None:
             raise RouteOptionSelectionError(
                 "calmest selection requires a qualified common P75"
             )
+        return p75
+
+    @staticmethod
+    def _calmest_secondary_key(
+        candidate: RouteCandidate,
+        basis: PedestrianFlowComparisonBasis,
+    ) -> tuple[tuple[bool, float], tuple[bool, float], float, float, int, str]:
+        median, _, maximum, _ = _basis_values(candidate, basis)
         return (
-            p75,
             _optional_number_key(median),
             _optional_number_key(maximum),
             candidate.duration_seconds,
@@ -206,6 +227,46 @@ class RouteOptionSelectionService:
             candidate.source_index,
             candidate.route_id,
         )
+
+    @classmethod
+    def _calmest_order(
+        cls,
+        candidates: Sequence[RouteCandidate],
+        basis: PedestrianFlowComparisonBasis,
+    ) -> tuple[RouteCandidate, ...]:
+        """Order deterministic practical-P75 groups from calmest upward."""
+
+        remaining = list(candidates)
+        ordered: list[RouteCandidate] = []
+        while remaining:
+            minimum_p75 = min(
+                cls._required_p75(candidate, basis)
+                for candidate in remaining
+            )
+            effective_ties = [
+                candidate
+                for candidate in remaining
+                if _p75_effectively_equal(
+                    cls._required_p75(candidate, basis),
+                    minimum_p75,
+                )
+            ]
+            effective_ties.sort(
+                key=lambda candidate: cls._calmest_secondary_key(
+                    candidate,
+                    basis,
+                )
+            )
+            ordered.extend(effective_ties)
+            selected_ids = {
+                candidate.route_id for candidate in effective_ties
+            }
+            remaining = [
+                candidate
+                for candidate in remaining
+                if candidate.route_id not in selected_ids
+            ]
+        return tuple(ordered)
 
     @staticmethod
     def _normalized(
@@ -262,10 +323,7 @@ class RouteOptionSelectionService:
         }
         if basis is PedestrianFlowComparisonBasis.UNKNOWN or len(candidates) < 2:
             return result
-        ordered = sorted(
-            candidates,
-            key=lambda candidate: self._calmest_key(candidate, basis),
-        )
+        ordered = self._calmest_order(candidates, basis)
         result[ordered[0].route_id] = RelativePedestrianActivity.LOWEST
         result[ordered[-1].route_id] = RelativePedestrianActivity.HIGHEST
         for candidate in ordered[1:-1]:
@@ -315,10 +373,7 @@ class RouteOptionSelectionService:
         }
         calmest: RouteCandidate | None = None
         if len(candidates) >= 2 and basis is not PedestrianFlowComparisonBasis.UNKNOWN:
-            calmest = min(
-                candidates,
-                key=lambda candidate: self._calmest_key(candidate, basis),
-            )
+            calmest = self._calmest_order(candidates, basis)[0]
             role_routes[RouteOptionRole.CALMEST] = calmest
 
         balanced_scores: dict[str, float] = {}
@@ -336,7 +391,7 @@ class RouteOptionSelectionService:
                 eligible,
                 key=lambda candidate: (
                     balanced_scores[candidate.route_id],
-                    self._calmest_key(candidate, basis)[0],
+                    self._required_p75(candidate, basis),
                     candidate.duration_seconds,
                     candidate.distance_meters,
                     candidate.source_index,
