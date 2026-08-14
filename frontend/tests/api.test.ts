@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { fetchRouteOptions, RouteOptionsApiError } from "../src/services/api";
 import {
+  makeMultiRoleRouteOptionsResponse,
   makeRouteOptionsResponse,
   SEARCH_REQUEST,
 } from "./fixtures";
@@ -87,6 +88,43 @@ describe("fetchRouteOptions", () => {
 
     expect(result.routes[0].typicalPedestrianMovementsPerMinute).toBe(0);
     expect(result.routes[1].typicalPedestrianMovementsPerMinute).toBeNull();
+  });
+
+  it("accepts one multi-role candidate and one candidate without roles", async () => {
+    const response = makeMultiRoleRouteOptionsResponse();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockResolvedValue(jsonResponse(response)),
+    );
+
+    const result = await fetchRouteOptions(SEARCH_REQUEST);
+
+    expect(result.routes).toHaveLength(3);
+    expect(result.routes.map((route) => route.routeId)).toEqual([
+      "route-1",
+      "route-2",
+      "route-3",
+    ]);
+    expect(result.routes[0].roleBadges).toEqual(["CALMEST", "FASTEST"]);
+    expect(result.routes[1].roleBadges).toEqual(["BALANCED"]);
+    expect(result.routes[2].roleBadges).toEqual([]);
+    expect(new Set(result.routes.map((route) => route.routeId)).size).toBe(3);
+  });
+
+  it("accepts three roles owned by three different route IDs", async () => {
+    const response = makeRouteOptionsResponse(3, "LIVE");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockResolvedValue(jsonResponse(response)),
+    );
+
+    const result = await fetchRouteOptions(SEARCH_REQUEST);
+
+    expect(result.routes.map((route) => route.roleBadges)).toEqual([
+      ["CALMEST"],
+      ["BALANCED"],
+      ["FASTEST"],
+    ]);
   });
 
   it("rejects malformed flow evidence with a safe API error", async () => {

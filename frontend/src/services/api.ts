@@ -540,7 +540,6 @@ function parseRouteOption(value: unknown): RouteOption | null {
     !isNonNegativeFiniteNumber(value.durationSeconds) ||
     !Array.isArray(value.steps) ||
     !Array.isArray(value.roleBadges) ||
-    value.roleBadges.length === 0 ||
     !value.roleBadges.every(isRouteRole) ||
     new Set(value.roleBadges).size !== value.roleBadges.length ||
     !isRelativePedestrianActivity(value.relativePedestrianActivity) ||

@@ -5,8 +5,12 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { JourneyProvider, useJourney } from "../src/context/JourneyContext";
 import RouteSearchPage from "../src/pages/RouteSearchPage";
+import { RouteOptionsApiError } from "../src/services/api";
 import type { RouteOptionsSearchRequest } from "../src/types/routeOptions";
-import { makeRouteOptionsResponse, SEARCH_REQUEST } from "./fixtures";
+import {
+  makeMultiRoleRouteOptionsResponse,
+  SEARCH_REQUEST,
+} from "./fixtures";
 
 vi.mock("../src/components/layout/AppHeader", () => ({
   default: () => <div>Header</div>,
@@ -39,6 +43,9 @@ function NavigationProbe() {
   return (
     <div>
       Stored {journey.routeOptions.length} routes for {journey.origin?.label}
+      <span>
+        IDs {journey.routeOptions.map((route) => route.routeId).join(",")}
+      </span>
     </div>
   );
 }
@@ -66,8 +73,8 @@ describe("RouteSearchPage", () => {
     vi.unstubAllGlobals();
   });
 
-  it("makes one request, stores the response, and navigates directly to Navigation", async () => {
-    const response = makeRouteOptionsResponse(3);
+  it("accepts a multi-role response and navigates directly to Navigation", async () => {
+    const response = makeMultiRoleRouteOptionsResponse();
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(JSON.stringify(response), {
         headers: { "Content-Type": "application/json" },
@@ -84,7 +91,9 @@ describe("RouteSearchPage", () => {
     expect(
       await screen.findByText("Stored 3 routes for Melbourne Central"),
     ).toBeInTheDocument();
+    expect(screen.getByText("IDs route-1,route-2,route-3")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(console.error).not.toHaveBeenCalled();
   });
 
   it.each([502, 503])(
@@ -111,6 +120,10 @@ describe("RouteSearchPage", () => {
       expect(
         screen.getByRole("button", { name: "Submit mocked search" }),
       ).toBeInTheDocument();
+      expect(console.error).toHaveBeenCalledWith(
+        "Unable to load route options.",
+        expect.any(RouteOptionsApiError),
+      );
     },
   );
 

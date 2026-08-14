@@ -22,7 +22,7 @@ function RouteSearchPage() {
       journey.setRouteOptions(request, result);
       navigate("/navigation");
     } catch (requestError: unknown) {
-      console.error("Unable to load route options.");
+      console.error("Unable to load route options.", requestError);
       setError(
         requestError instanceof RouteOptionsApiError &&
           requestError.reason === "ROUTING_UNAVAILABLE"

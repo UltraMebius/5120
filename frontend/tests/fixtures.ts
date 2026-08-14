@@ -137,3 +137,20 @@ export function makeRouteOptionsResponse(
     routes,
   };
 }
+
+export function makeMultiRoleRouteOptionsResponse(): RouteOptionsResponse {
+  const response = makeRouteOptionsResponse(3, "LIVE");
+  const [routeA, routeB, routeC] = response.routes;
+
+  routeA.durationSeconds = 780;
+  routeA.roleBadges = ["CALMEST", "FASTEST"];
+  routeA.balancedScore = 0.35;
+  routeB.durationSeconds = 1_080;
+  routeB.roleBadges = ["BALANCED"];
+  routeB.balancedScore = 0.4;
+  routeC.durationSeconds = 1_320;
+  routeC.roleBadges = [];
+  routeC.balancedScore = 0.8;
+
+  return response;
+}
