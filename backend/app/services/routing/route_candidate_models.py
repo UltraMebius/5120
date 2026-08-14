@@ -125,6 +125,14 @@ class CandidateGenerationTimings:
     third_route_attempted: bool = False
     third_route_added: bool = False
     remaining_request_budget: int = 0
+    initial_filtering_ms: float = 0.0
+    final_candidate_filtering_ms: float = 0.0
+    flow_evaluation_ms: float = 0.0
+    initial_crowd_evaluation_ms: float = 0.0
+    direct_crowd_evaluation_ms: float = 0.0
+    waypoint_crowd_evaluation_ms: float = 0.0
+    waypoint_attempt_count: int = 0
+    waypoint_retained_count: int = 0
 
 
 @dataclass(frozen=True, slots=True)

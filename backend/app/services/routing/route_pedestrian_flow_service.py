@@ -57,6 +57,8 @@ class RoutePedestrianFlowEvaluation:
     sampling_interval_meters: float
     samples: tuple[SamplePedestrianFlow, ...]
     summary: RoutePedestrianFlowSummary
+    sampling_ms: float = 0.0
+    aggregation_ms: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -193,8 +195,10 @@ class RoutePedestrianFlowService:
 
         sampling_started = perf_counter()
         sampled_routes: dict[int, SampledRoute] = {}
+        route_sampling_ms: dict[int, float] = {}
         batch_samples: list[FlowSamplePoint] = []
         for route in requested:
+            route_sampling_started = perf_counter()
             sampled = self.sampling_service.sample_geometry(route.geometry)
             sampled_routes[route.route_index] = sampled
             batch_samples.extend(
@@ -209,6 +213,9 @@ class RoutePedestrianFlowService:
                 )
                 for sample in sampled.samples
             )
+            route_sampling_ms[route.route_index] = (
+                perf_counter() - route_sampling_started
+            ) * 1000.0
         sampling_ms = (perf_counter() - sampling_started) * 1000.0
 
         batch_result = self.flow_service.evaluate_samples(tuple(batch_samples))
@@ -230,6 +237,7 @@ class RoutePedestrianFlowService:
             flows_by_route[sample.route_index].append(sample)
         evaluations: list[RoutePedestrianFlowEvaluation] = []
         for route in requested:
+            route_aggregation_started = perf_counter()
             ordered_flows = tuple(
                 sorted(
                     flows_by_route[route.route_index],
@@ -241,6 +249,9 @@ class RoutePedestrianFlowService:
                 route.route_index,
                 ordered_flows,
             )
+            route_aggregation_ms = (
+                perf_counter() - route_aggregation_started
+            ) * 1000.0
             evaluations.append(
                 RoutePedestrianFlowEvaluation(
                     route_index=route.route_index,
@@ -249,7 +260,22 @@ class RoutePedestrianFlowService:
                     sampling_interval_meters=sampled.sampling_interval_meters,
                     samples=ordered_flows,
                     summary=summary,
+                    sampling_ms=route_sampling_ms[route.route_index],
+                    aggregation_ms=route_aggregation_ms,
                 )
+            )
+            _LOGGER.info(
+                "route_crowd_evaluation_timing route_id=%s route_index=%d "
+                "sampling_ms=%.3f aggregation_ms=%.3f "
+                "local_evaluation_ms=%.3f shared_database_ms=%.3f "
+                "sample_count=%d database_scope=shared_route_batch",
+                route.route_id,
+                route.route_index,
+                route_sampling_ms[route.route_index],
+                route_aggregation_ms,
+                route_sampling_ms[route.route_index] + route_aggregation_ms,
+                batch_result.flow_batch_db_ms,
+                len(ordered_flows),
             )
         aggregation_ms = (perf_counter() - aggregation_started) * 1000.0
 

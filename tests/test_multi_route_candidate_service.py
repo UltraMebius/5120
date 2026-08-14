@@ -392,6 +392,44 @@ def test_similar_first_waypoint_is_rejected_then_second_is_attempted() -> None:
     assert len(routing.waypoint_calls) == 2
 
 
+def test_each_waypoint_attempt_logs_duration_and_retention_outcome(
+    caplog,
+) -> None:
+    with caplog.at_level(
+        "INFO",
+        logger=(
+            "backend.app.services.routing.multi_route_candidate_service"
+        ),
+    ):
+        result, _, _, _ = _generate(
+            [_route(0, DIRECT_COORDINATES)],
+            waypoints=[_waypoint(10), _waypoint(20)],
+            waypoint_responses=[
+                [_route(0, DIRECT_COORDINATES, duration=650)],
+                [_route(0, EAST_COORDINATES, duration=700)],
+            ],
+        )
+
+    messages = [
+        record.getMessage()
+        for record in caplog.records
+        if record.getMessage().startswith("waypoint_route_attempt_timing ")
+    ]
+    assert len(messages) == 2
+    assert "attempt=1" in messages[0]
+    assert "outcome=rejected_similarity" in messages[0]
+    assert "crowd_evaluation_stage=not_evaluated_rejected" in messages[0]
+    assert "attempt=2" in messages[1]
+    assert "outcome=retained_strict" in messages[1]
+    assert "crowd_evaluation_stage=deferred_shared_batch" in messages[1]
+    for message in messages:
+        assert "mapbox_ms=" in message
+        assert "filtering_ms=" in message
+        assert "total_ms=" in message
+    assert result.timings.waypoint_attempt_count == 2
+    assert result.timings.waypoint_retained_count == 1
+
+
 def test_excessive_first_waypoint_is_rejected_then_second_is_attempted() -> None:
     result, routing, _, _ = _generate(
         [_route(0, DIRECT_COORDINATES)],

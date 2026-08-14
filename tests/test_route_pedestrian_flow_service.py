@@ -203,3 +203,40 @@ def test_route_pipeline_does_not_assign_route_roles_or_rankings() -> None:
     route = result.routes[0]
     assert not hasattr(route, "rank")
     assert not hasattr(route, "role_badges")
+
+
+def test_route_pipeline_logs_each_route_and_the_shared_database_time(
+    caplog,
+) -> None:
+    with caplog.at_level(
+        "INFO",
+        logger=(
+            "backend.app.services.routing.route_pedestrian_flow_service"
+        ),
+    ):
+        result = RoutePedestrianFlowService(
+            FakeSamplingService(), FakeFlowService()
+        ).evaluate_routes(
+            [
+                RoutePedestrianFlowInput(0, 2, "direct-route"),
+                RoutePedestrianFlowInput(1, 1, "waypoint-route"),
+            ]
+        )
+
+    messages = [
+        record.getMessage()
+        for record in caplog.records
+        if record.getMessage().startswith("route_crowd_evaluation_timing ")
+    ]
+    assert len(messages) == 2
+    assert "route_id=direct-route" in messages[0]
+    assert "route_id=waypoint-route" in messages[1]
+    assert all("sampling_ms=" in message for message in messages)
+    assert all("aggregation_ms=" in message for message in messages)
+    assert all("shared_database_ms=3.250" in message for message in messages)
+    assert all(
+        "database_scope=shared_route_batch" in message
+        for message in messages
+    )
+    assert all(route.sampling_ms >= 0.0 for route in result.routes)
+    assert all(route.aggregation_ms >= 0.0 for route in result.routes)

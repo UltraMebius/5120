@@ -1,7 +1,9 @@
 """Deterministic selection of lower-flow, corridor-useful sensor waypoints."""
 
 from collections.abc import Sequence
+import logging
 import math
+from time import perf_counter
 from typing import Protocol
 
 from .route_candidate_config import (
@@ -18,6 +20,9 @@ from .route_candidate_models import (
     WaypointFlowSource,
     WaypointSensorEvidence,
 )
+
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class WaypointEvidenceConsistencyError(RuntimeError):
@@ -107,6 +112,7 @@ class FlowWaypointSelectionService:
         direct_route_geometry: object,
         limit: int = MAXIMUM_WAYPOINT_ATTEMPTS,
     ) -> tuple[SelectedFlowWaypoint, ...]:
+        selection_started = perf_counter()
         if not 0 <= limit <= MAXIMUM_WAYPOINT_ATTEMPTS:
             raise ValueError("waypoint limit exceeds the bounded attempt count")
         batch = self.repository.find_waypoint_evidence(
@@ -151,4 +157,18 @@ class FlowWaypointSelectionService:
         )
         live.sort(key=rank_key)
         historical.sort(key=rank_key)
-        return tuple((live + historical)[:limit])
+        selected = tuple((live + historical)[:limit])
+        selection_ms = (perf_counter() - selection_started) * 1000.0
+        _LOGGER.info(
+            "waypoint_selection_timing database_ms=%.3f "
+            "selection_total_ms=%.3f evidence_count=%d eligible_count=%d "
+            "selected_count=%d sql_execution_count=%d limit=%d",
+            batch.database_elapsed_ms,
+            selection_ms,
+            len(batch.evidence),
+            len(live) + len(historical),
+            len(selected),
+            batch.sql_execution_count,
+            limit,
+        )
+        return selected

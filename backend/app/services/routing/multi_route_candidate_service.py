@@ -355,9 +355,12 @@ class MultiRouteCandidateService:
         candidate_distinctness_ms = (
             perf_counter() - distinctness_started
         ) * 1000.0
+        initial_filtering_ms = candidate_distinctness_ms
 
         waypoint_selection_ms = 0.0
         waypoint_mapbox_ms = 0.0
+        waypoint_attempt_count = 0
+        waypoint_retained_count = 0
         third_route_attempted = False
         attempted_waypoint_ids: set[int] = set()
         reason = (
@@ -406,10 +409,13 @@ class MultiRouteCandidateService:
                     if waypoint.location_id in attempted_waypoint_ids:
                         continue
                     attempted_waypoint_ids.add(waypoint.location_id)
+                    waypoint_attempt_count += 1
+                    attempt_started = perf_counter()
                     if len(retained) >= MINIMUM_MEANINGFUL_ROUTES:
                         third_route_attempted = True
                     mapbox_request_count += 1
                     waypoint_mapbox_started = perf_counter()
+                    mapbox_error = "none"
                     try:
                         waypoint_routes = (
                             self.routing_service.find_routes_for_coordinates(
@@ -421,11 +427,22 @@ class MultiRouteCandidateService:
                                 alternatives=False,
                             )
                         )
-                    except (MapboxDirectionsError, WalkingRouteUnavailableError):
+                    except (
+                        MapboxDirectionsError,
+                        WalkingRouteUnavailableError,
+                    ) as error:
                         waypoint_routes = []
-                    waypoint_mapbox_ms += (
+                        mapbox_error = type(error).__name__
+                    attempt_mapbox_ms = (
                         perf_counter() - waypoint_mapbox_started
                     ) * 1000.0
+                    waypoint_mapbox_ms += attempt_mapbox_ms
+                    attempt_outcome = (
+                        "mapbox_error"
+                        if mapbox_error != "none"
+                        else "no_route"
+                    )
+                    retained_route_id: str | None = None
 
                     for raw_route in waypoint_routes:
                         candidate = self._candidate_from_route(
@@ -455,6 +472,7 @@ class MultiRouteCandidateService:
                         ):
                             rejected_relaxed_detour_count += 1
                             waypoint_detour_rejected = True
+                            attempt_outcome = "rejected_detour"
                             continue
                         comparison_started = perf_counter()
                         too_similar = any(
@@ -469,14 +487,19 @@ class MultiRouteCandidateService:
                         ) * 1000.0
                         if too_similar:
                             waypoint_similarity_rejected = True
+                            attempt_outcome = "rejected_similarity"
                             continue
                         retained.append(candidate)
+                        waypoint_retained_count += 1
+                        retained_route_id = candidate.route_id
                         if within_strict_detour:
+                            attempt_outcome = "retained_strict"
                             reason = (
                                 CandidateGenerationReason
                                 .WAYPOINT_ALTERNATIVE_ADDED
                             )
                         else:
+                            attempt_outcome = "retained_relaxed"
                             relaxed_fallback_activated = True
                             relaxed_alternative_added = True
                             reason = (
@@ -484,6 +507,34 @@ class MultiRouteCandidateService:
                                 .RELAXED_DETOUR_ALTERNATIVE_ADDED
                             )
                         break
+
+                    attempt_total_ms = (
+                        perf_counter() - attempt_started
+                    ) * 1000.0
+                    crowd_evaluation_stage = (
+                        "deferred_shared_batch"
+                        if retained_route_id is not None
+                        else "not_evaluated_rejected"
+                    )
+                    _LOGGER.info(
+                        "waypoint_route_attempt_timing attempt=%d "
+                        "location_id=%d flow_source=%s mapbox_ms=%.3f "
+                        "filtering_ms=%.3f total_ms=%.3f "
+                        "generated_route_count=%d outcome=%s "
+                        "retained_route_id=%s mapbox_error=%s "
+                        "crowd_evaluation_stage=%s",
+                        waypoint_attempt_count,
+                        waypoint.location_id,
+                        waypoint.flow_source.value,
+                        attempt_mapbox_ms,
+                        max(0.0, attempt_total_ms - attempt_mapbox_ms),
+                        attempt_total_ms,
+                        len(waypoint_routes),
+                        attempt_outcome,
+                        retained_route_id,
+                        mapbox_error,
+                        crowd_evaluation_stage,
+                    )
 
                 if len(retained) < MINIMUM_MEANINGFUL_ROUTES:
                     if waypoint_detour_rejected:
@@ -500,13 +551,54 @@ class MultiRouteCandidateService:
         )
         bounding_started = perf_counter()
         retained = self._bounded_diverse_pool(retained)
-        candidate_distinctness_ms += (
+        final_candidate_filtering_ms = (
             perf_counter() - bounding_started
         ) * 1000.0
+        candidate_distinctness_ms += final_candidate_filtering_ms
+        flow_evaluation_started = perf_counter()
         evaluated_candidates, flow_evaluation = self._attach_flow_summaries(
             retained
         )
+        flow_evaluation_ms = (
+            perf_counter() - flow_evaluation_started
+        ) * 1000.0
         flow_timings = flow_evaluation.timings
+        evaluations_by_route_index = {
+            evaluation.route_index: evaluation
+            for evaluation in flow_evaluation.routes
+        }
+        initial_crowd_evaluation_ms = 0.0
+        direct_crowd_evaluation_ms = 0.0
+        waypoint_crowd_evaluation_ms = 0.0
+        for route_index, candidate in enumerate(evaluated_candidates):
+            evaluation = evaluations_by_route_index[route_index]
+            local_evaluation_ms = (
+                evaluation.sampling_ms + evaluation.aggregation_ms
+            )
+            if candidate.candidate_source is RouteCandidateSource.FLOW_WAYPOINT:
+                waypoint_crowd_evaluation_ms += local_evaluation_ms
+            else:
+                initial_crowd_evaluation_ms += local_evaluation_ms
+                if candidate.candidate_source is RouteCandidateSource.DIRECT:
+                    direct_crowd_evaluation_ms += local_evaluation_ms
+            _LOGGER.info(
+                "candidate_crowd_evaluation_timing route_id=%s source=%s "
+                "sampling_ms=%.3f aggregation_ms=%.3f "
+                "local_evaluation_ms=%.3f shared_database_ms=%.3f "
+                "waypoint_location_id=%s "
+                "database_scope=shared_all_candidates",
+                candidate.route_id,
+                candidate.candidate_source.value,
+                evaluation.sampling_ms,
+                evaluation.aggregation_ms,
+                local_evaluation_ms,
+                flow_timings.flow_batch_db_ms,
+                (
+                    candidate.waypoint_metadata.location_id
+                    if candidate.waypoint_metadata is not None
+                    else None
+                ),
+            )
         total_ms = (perf_counter() - total_started) * 1000.0
         timings = CandidateGenerationTimings(
             mapbox_initial_ms=mapbox_initial_ms,
@@ -537,12 +629,25 @@ class MultiRouteCandidateService:
             remaining_request_budget=(
                 MAXIMUM_MAPBOX_REQUESTS - mapbox_request_count
             ),
+            initial_filtering_ms=initial_filtering_ms,
+            final_candidate_filtering_ms=final_candidate_filtering_ms,
+            flow_evaluation_ms=flow_evaluation_ms,
+            initial_crowd_evaluation_ms=initial_crowd_evaluation_ms,
+            direct_crowd_evaluation_ms=direct_crowd_evaluation_ms,
+            waypoint_crowd_evaluation_ms=waypoint_crowd_evaluation_ms,
+            waypoint_attempt_count=waypoint_attempt_count,
+            waypoint_retained_count=waypoint_retained_count,
         )
         _LOGGER.info(
             "multi_route_candidates mapbox_initial_ms=%.3f "
-            "candidate_distinctness_ms=%.3f waypoint_selection_ms=%.3f "
-            "waypoint_mapbox_ms=%.3f sampling_ms=%.3f "
+            "initial_filtering_ms=%.3f candidate_distinctness_ms=%.3f "
+            "waypoint_selection_ms=%.3f waypoint_mapbox_ms=%.3f "
+            "waypoint_attempt_count=%d waypoint_retained_count=%d "
+            "initial_crowd_evaluation_ms=%.3f "
+            "direct_crowd_evaluation_ms=%.3f "
+            "waypoint_crowd_evaluation_ms=%.3f sampling_ms=%.3f "
             "flow_batch_db_ms=%.3f flow_aggregation_ms=%.3f total_ms=%.3f "
+            "flow_evaluation_ms=%.3f final_candidate_filtering_ms=%.3f "
             "mapbox_request_count=%d candidate_count_before_filter=%d "
             "candidate_count_after_filter=%d flow_sql_execution_count=%d "
             "strict_detour_limit_seconds=%.3f "
@@ -554,13 +659,21 @@ class MultiRouteCandidateService:
             "third_route_added=%s remaining_request_budget=%d "
             "generation_reason=%s",
             timings.mapbox_initial_ms,
+            timings.initial_filtering_ms,
             timings.candidate_distinctness_ms,
             timings.waypoint_selection_ms,
             timings.waypoint_mapbox_ms,
+            timings.waypoint_attempt_count,
+            timings.waypoint_retained_count,
+            timings.initial_crowd_evaluation_ms,
+            timings.direct_crowd_evaluation_ms,
+            timings.waypoint_crowd_evaluation_ms,
             timings.sampling_ms,
             timings.flow_batch_db_ms,
             timings.flow_aggregation_ms,
             timings.total_ms,
+            timings.flow_evaluation_ms,
+            timings.final_candidate_filtering_ms,
             timings.mapbox_request_count,
             timings.candidate_count_before_filter,
             timings.candidate_count_after_filter,

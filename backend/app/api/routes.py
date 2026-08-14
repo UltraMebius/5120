@@ -1,6 +1,8 @@
 """Backend-owned Mapbox walking-route acquisition endpoint."""
 
 from functools import lru_cache
+import logging
+from time import perf_counter
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -51,6 +53,7 @@ from ..services.routing.routing_service import (
 
 
 router = APIRouter(tags=["routes"])
+_LOGGER = logging.getLogger(__name__)
 
 
 @lru_cache
@@ -305,15 +308,72 @@ def list_route_options(
 ) -> RouteOptionsResponse:
     """Generate candidates once, then assign product roles in memory."""
 
+    request_started = perf_counter()
     try:
+        candidate_generation_started = perf_counter()
         candidates = candidate_service.generate_candidates(
             origin_longitude=request.origin.longitude,
             origin_latitude=request.origin.latitude,
             destination_longitude=request.destination.longitude,
             destination_latitude=request.destination.latitude,
         )
+        candidate_generation_ms = (
+            perf_counter() - candidate_generation_started
+        ) * 1000.0
+        role_assignment_started = perf_counter()
         selection = selection_service.select_options(candidates)
-        return _public_route_options(selection)
+        role_assignment_wall_ms = (
+            perf_counter() - role_assignment_started
+        ) * 1000.0
+        response_construction_started = perf_counter()
+        response = _public_route_options(selection)
+        response_construction_ms = (
+            perf_counter() - response_construction_started
+        ) * 1000.0
+        total_ms = (perf_counter() - request_started) * 1000.0
+        timings = candidates.timings
+        _LOGGER.info(
+            "routes_options_timing direct_mapbox_ms=%.3f "
+            "initial_filtering_ms=%.3f "
+            "waypoint_selection_ms=%.3f waypoint_attempts=%d "
+            "waypoint_mapbox_ms=%.3f "
+            "initial_crowd_evaluation_ms=%.3f "
+            "direct_crowd_evaluation_ms=%.3f "
+            "waypoint_crowd_evaluation_ms=%.3f "
+            "route_sampling_ms=%.3f database_ms=%.3f "
+            "route_aggregation_ms=%.3f flow_evaluation_ms=%.3f "
+            "final_candidate_filtering_ms=%.3f "
+            "role_assignment_ms=%.3f role_assignment_wall_ms=%.3f "
+            "response_construction_ms=%.3f candidate_generation_ms=%.3f "
+            "total_ms=%.3f mapbox_request_count=%d "
+            "flow_sql_execution_count=%d route_count=%d "
+            "generation_reason=%s "
+            "database_scope=shared_all_candidates "
+            "framework_response_serialization_included=false",
+            timings.mapbox_initial_ms,
+            timings.initial_filtering_ms,
+            timings.waypoint_selection_ms,
+            timings.waypoint_attempt_count,
+            timings.waypoint_mapbox_ms,
+            timings.initial_crowd_evaluation_ms,
+            timings.direct_crowd_evaluation_ms,
+            timings.waypoint_crowd_evaluation_ms,
+            timings.sampling_ms,
+            timings.flow_batch_db_ms,
+            timings.flow_aggregation_ms,
+            timings.flow_evaluation_ms,
+            timings.final_candidate_filtering_ms,
+            selection.route_role_selection_ms,
+            role_assignment_wall_ms,
+            response_construction_ms,
+            candidate_generation_ms,
+            total_ms,
+            timings.mapbox_request_count,
+            timings.flow_sql_execution_count,
+            len(selection.routes),
+            response.generationReason.value,
+        )
+        return response
     except MapboxDirectionsConfigurationError:
         raise HTTPException(
             status_code=503,

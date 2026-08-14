@@ -176,3 +176,35 @@ def test_lateral_middle_waypoint_remains_eligible_without_changing_flow_order() 
     )
 
     assert [waypoint.location_id for waypoint in selected] == [2, 1]
+
+
+def test_waypoint_selection_logs_repository_and_selection_timings(caplog) -> None:
+    repository = FakeRepository([_evidence(_sensor(1))])
+
+    with caplog.at_level(
+        "INFO",
+        logger=(
+            "backend.app.services.routing.flow_waypoint_selection_service"
+        ),
+    ):
+        selected = FlowWaypointSelectionService(repository).select_waypoints(
+            origin=(144.96, -37.82),
+            destination=(144.96, -37.81),
+            direct_route_geometry={"type": "LineString", "coordinates": []},
+        )
+
+    assert len(selected) == 1
+    message = next(
+        record.getMessage()
+        for record in caplog.records
+        if record.getMessage().startswith("waypoint_selection_timing ")
+    )
+    for field in (
+        "database_ms=2.000",
+        "selection_total_ms=",
+        "evidence_count=1",
+        "eligible_count=1",
+        "selected_count=1",
+        "sql_execution_count=1",
+    ):
+        assert field in message

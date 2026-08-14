@@ -239,6 +239,41 @@ def test_options_api_preserves_route_and_source_separated_flow_contract() -> Non
     assert route["historicalPedestrianFlow"]["p75MovementsPerMinute"] == 30.0
 
 
+def test_options_api_logs_structured_end_to_end_timing(caplog) -> None:
+    with caplog.at_level("INFO", logger="backend.app.api.routes"):
+        response, _, _ = _post(
+            [_candidate(0, duration=600)],
+            reason=CandidateGenerationReason.WAYPOINT_ALTERNATIVE_ADDED,
+        )
+
+    assert response.status_code == 200
+    message = next(
+        record.getMessage()
+        for record in caplog.records
+        if record.getMessage().startswith("routes_options_timing ")
+    )
+    for field in (
+        "direct_mapbox_ms=1.000",
+        "initial_filtering_ms=",
+        "waypoint_selection_ms=0.000",
+        "waypoint_attempts=0",
+        "initial_crowd_evaluation_ms=",
+        "direct_crowd_evaluation_ms=",
+        "waypoint_crowd_evaluation_ms=",
+        "route_sampling_ms=3.000",
+        "database_ms=4.000",
+        "route_aggregation_ms=5.000",
+        "final_candidate_filtering_ms=",
+        "role_assignment_ms=",
+        "response_construction_ms=",
+        "candidate_generation_ms=",
+        "total_ms=",
+        "generation_reason=WAYPOINT_ALTERNATIVE_ADDED",
+        "framework_response_serialization_included=false",
+    ):
+        assert field in message
+
+
 @pytest.mark.parametrize(
     ("candidate_source", "expected_public_reason"),
     [
