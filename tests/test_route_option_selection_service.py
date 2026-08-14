@@ -389,15 +389,18 @@ def test_calmest_uses_source_index_then_route_id_for_final_ties() -> None:
     assert RouteOptionRole.CALMEST in _by_id(result)["a"].role_badges
 
 
-def test_two_routes_receive_distinct_calmest_and_fastest_roles() -> None:
+def test_two_routes_can_attach_calmest_and_fastest_to_the_same_route() -> None:
     result = _select(
         _candidate("a", 0, duration=600, live_median=10, live_p75=15),
         _candidate("b", 1, duration=780, live_median=20, live_p75=30),
     )
 
     assert [route.candidate.route_id for route in result.routes] == ["a", "b"]
-    assert result.routes[0].role_badges == (RouteOptionRole.CALMEST,)
-    assert result.routes[1].role_badges == (RouteOptionRole.FASTEST,)
+    assert result.routes[0].role_badges == (
+        RouteOptionRole.CALMEST,
+        RouteOptionRole.FASTEST,
+    )
+    assert result.routes[1].role_badges == ()
 
 
 def test_three_route_balanced_normalization_and_response_order() -> None:
@@ -472,23 +475,67 @@ def test_equal_duration_and_crowd_ranges_do_not_divide_by_zero() -> None:
     assert [route.balanced_score for route in result.routes] == [0.0, 0.0, 0.0]
 
 
-def test_calmest_fastest_conflict_assigns_three_distinct_routes() -> None:
+def test_roles_are_independent_and_preserve_the_original_candidate() -> None:
+    fastest_calmest = _candidate(
+        "a",
+        0,
+        duration=600,
+        live_median=10,
+        live_p75=10,
+    )
     result = _select(
-        _candidate("a", 0, duration=600, live_median=10, live_p75=10),
+        fastest_calmest,
         _candidate("b", 1, duration=700, live_median=20, live_p75=20),
         _candidate("c", 2, duration=800, live_median=30, live_p75=30),
     )
     routes = _by_id(result)
 
-    assert routes["a"].role_badges == (RouteOptionRole.CALMEST,)
-    assert routes["b"].role_badges == (RouteOptionRole.FASTEST,)
-    assert routes["c"].role_badges == (RouteOptionRole.BALANCED,)
-    assert routes["b"].candidate.duration_seconds == min(
-        route.candidate.duration_seconds
-        for route in routes.values()
-        if route.candidate.route_id != "a"
+    assert routes["a"].role_badges == (
+        RouteOptionRole.CALMEST,
+        RouteOptionRole.FASTEST,
+        RouteOptionRole.BALANCED,
+    )
+    assert routes["a"].candidate is fastest_calmest
+    assert routes["b"].role_badges == ()
+    assert routes["c"].role_badges == ()
+    assert routes["a"].candidate.duration_seconds == min(
+        route.candidate.duration_seconds for route in routes.values()
     )
     assert len({route.candidate.route_id for route in result.routes}) == 3
+
+
+def test_fastest_is_global_minimum_when_calmest_is_already_fastest() -> None:
+    result = _select(
+        _candidate(
+            "calm-fast",
+            0,
+            duration=780,
+            distance=2_000,
+            live_median=8,
+        ),
+        _candidate(
+            "slower",
+            1,
+            duration=1_080,
+            distance=500,
+            live_median=9,
+        ),
+        _candidate("slowest", 2, duration=1_320, live_median=18),
+    )
+    routes = _by_id(result)
+    fastest_routes = [
+        route
+        for route in result.routes
+        if RouteOptionRole.FASTEST in route.role_badges
+    ]
+
+    assert len(fastest_routes) == 1
+    assert fastest_routes[0].candidate.route_id == "calm-fast"
+    assert fastest_routes[0].candidate.duration_seconds == min(
+        route.candidate.duration_seconds for route in routes.values()
+    )
+    assert RouteOptionRole.FASTEST not in routes["slower"].role_badges
+    assert RouteOptionRole.FASTEST not in routes["slowest"].role_badges
 
 
 def test_two_comparable_routes_receive_lowest_and_highest_metadata() -> None:

@@ -167,6 +167,71 @@ describe("route selection and active navigation journey", () => {
     ).toBeGreaterThan(0);
   });
 
+  it("selects one multi-role card with its original geometry and Navigation data", async () => {
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => ({ matches: true })),
+    );
+    const response = makeRouteOptionsResponse(3, "LIVE");
+    const multiRoleRoute = response.routes[0];
+    multiRoleRoute.durationSeconds = 600;
+    multiRoleRoute.roleBadges = ["CALMEST", "FASTEST", "BALANCED"];
+    multiRoleRoute.balancedScore = 0;
+    response.routes[1].roleBadges = [];
+    response.routes[2].roleBadges = [];
+    const fetchMock = vi.mocked(fetch);
+
+    renderJourney("/navigation", response);
+
+    const articles = await screen.findAllByRole("article");
+    expect(articles).toHaveLength(3);
+    expect(within(articles[0]).getByText("CALMEST")).toBeInTheDocument();
+    expect(within(articles[0]).getByText("FASTEST")).toBeInTheDocument();
+    expect(within(articles[0]).getByText("BALANCED")).toBeInTheDocument();
+
+    const selectors = screen.getAllByRole("tab");
+    await userEvent.click(selectors[1]);
+    expect(screen.getByTestId("route-map")).toHaveTextContent(
+      `selection:${response.routes[1].routeId}`,
+    );
+    await userEvent.click(selectors[0]);
+    const map = screen.getByTestId("route-map");
+    expect(map).toHaveTextContent(`selection:${multiRoleRoute.routeId}`);
+    expect(map).toHaveAttribute(
+      "data-active-geometry",
+      JSON.stringify(multiRoleRoute.geometry.coordinates),
+    );
+
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "Select CALMEST + FASTEST + BALANCED route",
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("navigation-page")).toHaveAttribute(
+        "data-navigation-mode",
+        "active",
+      ),
+    );
+
+    expect(map).toHaveTextContent(`active:${multiRoleRoute.routeId}`);
+    expect(map).toHaveAttribute(
+      "data-active-geometry",
+      JSON.stringify(multiRoleRoute.geometry.coordinates),
+    );
+    expect(
+      within(
+        screen.getByRole("region", { name: "Next walking direction" }),
+      ).getByText(multiRoleRoute.steps[0].instruction),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "Route summary" })).getByText(
+        "CALMEST + FASTEST + BALANCED",
+      ),
+    ).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("distinguishes historical evidence from unavailable/null activity", async () => {
     const { unmount } = renderJourney(
       "/navigation",

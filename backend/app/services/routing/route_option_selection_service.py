@@ -133,7 +133,7 @@ def _optional_number_key(value: float | None) -> tuple[bool, float]:
 
 
 class RouteOptionSelectionService:
-    """Assign distinct product roles from the values shown by the active UI."""
+    """Assign independent product roles from values shown by the active UI."""
 
     def __init__(
         self,
@@ -352,12 +352,7 @@ class RouteOptionSelectionService:
             calmest = self._calmest_order(candidates, basis)[0]
             role_routes[RouteOptionRole.CALMEST] = calmest
 
-        fastest_candidates = tuple(
-            candidate
-            for candidate in candidates
-            if calmest is None or candidate.route_id != calmest.route_id
-        )
-        fastest = min(fastest_candidates, key=self._fastest_key)
+        fastest = min(candidates, key=self._fastest_key)
         role_routes[RouteOptionRole.FASTEST] = fastest
 
         balanced_scores: dict[str, float] = {}
@@ -366,16 +361,8 @@ class RouteOptionSelectionService:
             and basis is not PedestrianFlowComparisonBasis.UNKNOWN
         ):
             balanced_scores = self._balanced_scores(candidates, basis)
-            excluded_ids = {fastest.route_id}
-            if calmest is not None:
-                excluded_ids.add(calmest.route_id)
-            eligible = tuple(
-                candidate
-                for candidate in candidates
-                if candidate.route_id not in excluded_ids
-            )
             balanced = min(
-                eligible,
+                candidates,
                 key=lambda candidate: (
                     balanced_scores[candidate.route_id],
                     self._required_typical(candidate, basis),

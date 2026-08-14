@@ -72,18 +72,18 @@ evidence in the same comparison.
 
 ### FASTEST
 
-When no common crowd basis exists, `FASTEST` is the minimum lexicographic key:
+`FASTEST` is always the global minimum lexicographic key across all candidate
+routes:
 
 1. duration;
 2. distance;
 3. source index;
 4. route ID.
 
-This role is always assigned. With a usable comparison basis, `CALMEST` is
-reserved first and `FASTEST` uses the same key over the remaining candidates.
-This keeps role IDs distinct. If the overall shortest route is also the lowest
-displayed-flow route, it remains `CALMEST` and the shortest remaining route is
-`FASTEST`.
+This role is always assigned and is independent of the other roles. If the
+overall shortest route is also the lowest displayed-flow route, that same
+route is both `FASTEST` and `CALMEST`; a slower route is never relabelled as
+`FASTEST` to make the role IDs distinct.
 
 ### CALMEST
 
@@ -109,17 +109,18 @@ normalised across the candidate set. Each route receives:
 balanced score = 0.5 * normalised duration + 0.5 * normalised typical flow
 ```
 
-The already selected calmest and fastest routes are excluded. The remaining
-route with the lowest key is selected by balanced score, typical flow,
-duration, distance, source index, then route ID. The active candidate generator
-returns at most three routes, so a three-route response assigns `BALANCED` to
-the one remaining route.
+All candidates remain eligible, including a route already labelled `CALMEST`
+or `FASTEST`. The route with the lowest key is selected by balanced score,
+typical flow, duration, distance, source index, then route ID. Consequently,
+one route may carry `BALANCED` together with either or both other roles.
 
 ### Response order and relative activity
 
 Unique routes are returned by role order `CALMEST`, `FASTEST`, `BALANCED`,
-followed by any remaining candidates in fastest-key order. With a usable
-comparison basis, each role is attached to a distinct route ID.
+followed by any remaining candidates in fastest-key order. Roles are attached
+independently to their winning route IDs. When multiple roles select the same
+route, that original route is returned once with multiple badges; it is not
+duplicated or detached from its geometry, metrics, or navigation steps.
 
 When at least two routes share usable evidence, relative pedestrian activity is
 assigned from the same displayed-median ordering as `LOWEST`, `MIDDLE`, and

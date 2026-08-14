@@ -396,6 +396,43 @@ def test_options_api_roles_follow_displayed_typical_activity_and_duration() -> N
     )
 
 
+def test_options_api_serializes_independent_roles_on_one_original_route() -> None:
+    response, _, _ = _post(
+        [
+            _candidate(0, duration=780, live_median=8, live_p75=8),
+            _candidate(1, duration=1_080, live_median=9, live_p75=9),
+            _candidate(2, duration=1_320, live_median=18, live_p75=18),
+        ]
+    )
+
+    assert response.status_code == 200
+    routes = response.json()["routes"]
+    assert len(routes) == 3
+    assert len({route["routeId"] for route in routes}) == 3
+    multi_role = next(
+        route for route in routes if route["routeId"] == "route-0"
+    )
+    assert multi_role["roleBadges"] == ["CALMEST", "FASTEST", "BALANCED"]
+    assert multi_role["durationSeconds"] == min(
+        route["durationSeconds"] for route in routes
+    )
+    assert multi_role["typicalPedestrianMovementsPerMinute"] == min(
+        route["typicalPedestrianMovementsPerMinute"] for route in routes
+    )
+    assert all(
+        "FASTEST" not in route["roleBadges"]
+        for route in routes
+        if route["routeId"] != multi_role["routeId"]
+    )
+    assert multi_role["geometry"]["coordinates"] == [
+        [144.963, -37.813],
+        [144.965, -37.815],
+        [144.968, -37.818],
+    ]
+    assert multi_role["distanceMeters"] == 1_100
+    assert multi_role["steps"][0]["instruction"] == "Walk route 0"
+
+
 def test_options_api_serializes_unknown_basis_with_nullable_selected_metrics() -> None:
     response, _, _ = _post(
         [
