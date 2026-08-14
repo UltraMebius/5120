@@ -144,13 +144,13 @@ export function makeMultiRoleRouteOptionsResponse(): RouteOptionsResponse {
 
   routeA.durationSeconds = 780;
   routeA.roleBadges = ["CALMEST", "FASTEST"];
-  routeA.balancedScore = 0.35;
+  routeA.balancedScore = 0;
   routeB.durationSeconds = 1_080;
   routeB.roleBadges = ["BALANCED"];
-  routeB.balancedScore = 0.4;
+  routeB.balancedScore = 0.5 * (300 / 540) + 0.5 * (3 / 7);
   routeC.durationSeconds = 1_320;
   routeC.roleBadges = [];
-  routeC.balancedScore = 0.8;
+  routeC.balancedScore = 1;
 
   return response;
 }

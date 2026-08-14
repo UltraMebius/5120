@@ -100,6 +100,12 @@ def _by_id(result):
     return {route.candidate.route_id: route for route in result.routes}
 
 
+def _role_owner(result, role: RouteOptionRole):
+    owners = [route for route in result.routes if role in route.role_badges]
+    assert len(owners) == 1
+    return owners[0]
+
+
 def test_all_live_qualified_routes_use_live_comparison_values() -> None:
     result = _select(
         _candidate("a", 0, duration=600, live_median=11, live_p75=21),
@@ -400,7 +406,7 @@ def test_two_routes_can_attach_calmest_and_fastest_to_the_same_route() -> None:
         RouteOptionRole.CALMEST,
         RouteOptionRole.FASTEST,
     )
-    assert result.routes[1].role_badges == ()
+    assert result.routes[1].role_badges == (RouteOptionRole.BALANCED,)
 
 
 def test_three_route_balanced_normalization_and_response_order() -> None:
@@ -429,10 +435,10 @@ def test_three_route_balanced_normalization_and_response_order() -> None:
     ]
 
 
-def test_balanced_is_absent_for_two_routes_or_unknown_basis() -> None:
+def test_balanced_is_absent_for_separate_two_route_roles_or_unknown_basis() -> None:
     two = _select(
-        _candidate("a", 0, duration=600),
-        _candidate("b", 1, duration=700),
+        _candidate("fast", 0, duration=600, live_median=30),
+        _candidate("calm", 1, duration=700, live_median=10),
     )
     unknown = _select(
         _candidate(
@@ -458,7 +464,9 @@ def test_balanced_is_absent_for_two_routes_or_unknown_basis() -> None:
         ),
     )
 
-    assert all(RouteOptionRole.BALANCED not in row.role_badges for row in two.routes)
+    assert all(
+        RouteOptionRole.BALANCED not in row.role_badges for row in two.routes
+    )
     assert all(row.balanced_score is None for row in two.routes)
     assert all(
         RouteOptionRole.BALANCED not in row.role_badges for row in unknown.routes
@@ -475,7 +483,7 @@ def test_equal_duration_and_crowd_ranges_do_not_divide_by_zero() -> None:
     assert [route.balanced_score for route in result.routes] == [0.0, 0.0, 0.0]
 
 
-def test_roles_are_independent_and_preserve_the_original_candidate() -> None:
+def test_absolute_roles_overlap_and_balanced_uses_a_remaining_candidate() -> None:
     fastest_calmest = _candidate(
         "a",
         0,
@@ -493,10 +501,9 @@ def test_roles_are_independent_and_preserve_the_original_candidate() -> None:
     assert routes["a"].role_badges == (
         RouteOptionRole.CALMEST,
         RouteOptionRole.FASTEST,
-        RouteOptionRole.BALANCED,
     )
     assert routes["a"].candidate is fastest_calmest
-    assert routes["b"].role_badges == ()
+    assert routes["b"].role_badges == (RouteOptionRole.BALANCED,)
     assert routes["c"].role_badges == ()
     assert routes["a"].candidate.duration_seconds == min(
         route.candidate.duration_seconds for route in routes.values()
@@ -536,6 +543,171 @@ def test_fastest_is_global_minimum_when_calmest_is_already_fastest() -> None:
     )
     assert RouteOptionRole.FASTEST not in routes["slower"].role_badges
     assert RouteOptionRole.FASTEST not in routes["slowest"].role_badges
+
+
+def test_three_distinct_absolute_roles_assign_balanced_to_third_route() -> None:
+    result = _select(
+        _candidate("calm", 0, duration=800, live_median=5),
+        _candidate("fast", 1, duration=600, live_median=30),
+        _candidate("trade", 2, duration=700, live_median=20),
+    )
+    routes = _by_id(result)
+
+    assert routes["calm"].role_badges == (RouteOptionRole.CALMEST,)
+    assert routes["fast"].role_badges == (RouteOptionRole.FASTEST,)
+    assert routes["trade"].role_badges == (RouteOptionRole.BALANCED,)
+    assert _role_owner(result, RouteOptionRole.BALANCED).candidate.route_id == (
+        "trade"
+    )
+
+
+def test_overlap_assigns_balanced_to_best_of_two_remaining_routes() -> None:
+    result = _select(
+        _candidate("absolute", 0, duration=600, live_median=5),
+        _candidate("higher-flow", 1, duration=700, live_median=20),
+        _candidate("trade", 2, duration=800, live_median=10),
+    )
+    routes = _by_id(result)
+
+    assert routes["absolute"].role_badges == (
+        RouteOptionRole.CALMEST,
+        RouteOptionRole.FASTEST,
+    )
+    assert routes["trade"].role_badges == (RouteOptionRole.BALANCED,)
+    assert routes["higher-flow"].role_badges == ()
+    assert len({route.candidate.route_id for route in result.routes}) == 3
+
+
+def test_global_best_balanced_calmest_is_excluded_when_route_remains() -> None:
+    result = _select(
+        _candidate("calm", 0, duration=610, live_median=0),
+        _candidate("fast", 1, duration=600, live_median=100),
+        _candidate("remaining", 2, duration=1_000, live_median=90),
+    )
+    routes = _by_id(result)
+
+    assert routes["calm"].balanced_score < routes["remaining"].balanced_score
+    assert routes["calm"].balanced_score < routes["fast"].balanced_score
+    assert RouteOptionRole.BALANCED not in routes["calm"].role_badges
+    assert routes["remaining"].role_badges == (RouteOptionRole.BALANCED,)
+
+
+def test_global_best_balanced_fastest_is_excluded_when_route_remains() -> None:
+    result = _select(
+        _candidate("calm", 0, duration=1_000, live_median=0),
+        _candidate("fast", 1, duration=600, live_median=10),
+        _candidate("remaining", 2, duration=1_100, live_median=100),
+    )
+    routes = _by_id(result)
+
+    assert routes["fast"].balanced_score < routes["remaining"].balanced_score
+    assert routes["fast"].balanced_score < routes["calm"].balanced_score
+    assert RouteOptionRole.BALANCED not in routes["fast"].role_badges
+    assert routes["remaining"].role_badges == (RouteOptionRole.BALANCED,)
+
+
+def test_two_distinct_absolute_role_owners_do_not_create_balanced() -> None:
+    result = _select(
+        _candidate("calm", 0, duration=700, live_median=5),
+        _candidate("fast", 1, duration=600, live_median=20),
+    )
+
+    assert len(result.routes) == 2
+    assert _by_id(result)["calm"].role_badges == (RouteOptionRole.CALMEST,)
+    assert _by_id(result)["fast"].role_badges == (RouteOptionRole.FASTEST,)
+    assert all(route.balanced_score is None for route in result.routes)
+
+
+def test_two_route_overlap_assigns_balanced_to_comparable_remaining_route() -> None:
+    result = _select(
+        _candidate("absolute", 0, duration=600, live_median=5),
+        _candidate("remaining", 1, duration=700, live_median=20),
+    )
+    routes = _by_id(result)
+
+    assert routes["absolute"].role_badges == (
+        RouteOptionRole.CALMEST,
+        RouteOptionRole.FASTEST,
+    )
+    assert routes["remaining"].role_badges == (RouteOptionRole.BALANCED,)
+    assert len(result.routes) == 2
+
+
+def test_missing_crowd_fastest_cannot_win_calmest_or_balanced() -> None:
+    result = _select(
+        _candidate(
+            "missing-fast",
+            0,
+            duration=500,
+            live_median=None,
+            historical_median=None,
+        ),
+        _candidate("numeric-a", 1, duration=600, live_median=8),
+        _candidate("numeric-b", 2, duration=700, live_median=12),
+    )
+    routes = _by_id(result)
+
+    assert result.comparison_basis is PedestrianFlowComparisonBasis.UNKNOWN
+    assert routes["missing-fast"].role_badges == (RouteOptionRole.FASTEST,)
+    assert all(
+        RouteOptionRole.CALMEST not in route.role_badges
+        and RouteOptionRole.BALANCED not in route.role_badges
+        for route in result.routes
+    )
+
+
+def test_fastest_is_global_exact_duration_minimum_across_candidate_sets() -> None:
+    candidate_sets = (
+        (
+            _candidate("a", 0, duration=780.2, distance=2_000),
+            _candidate("b", 1, duration=780.1, distance=3_000),
+        ),
+        (
+            _candidate("a", 0, duration=900, live_median=5),
+            _candidate("b", 1, duration=600, live_median=20),
+            _candidate("c", 2, duration=700, live_median=10),
+        ),
+    )
+
+    for candidates in candidate_sets:
+        result = _select(*candidates)
+        fastest = _role_owner(result, RouteOptionRole.FASTEST).candidate
+        assert all(
+            fastest.duration_seconds <= candidate.duration_seconds
+            for candidate in candidates
+        )
+
+
+def test_calmest_is_global_displayed_median_minimum_for_numeric_sets() -> None:
+    candidate_sets = (
+        (
+            _candidate("a", 0, duration=600, live_median=9),
+            _candidate("b", 1, duration=700, live_median=8),
+        ),
+        (
+            _candidate("a", 0, duration=900, live_median=15),
+            _candidate("b", 1, duration=600, live_median=20),
+            _candidate("c", 2, duration=700, live_median=10),
+        ),
+    )
+
+    for candidates in candidate_sets:
+        result = _select(*candidates)
+        calmest = _role_owner(result, RouteOptionRole.CALMEST)
+        calmest_typical = (
+            calmest.comparison_pedestrian_flow.typical_movements_per_minute
+        )
+        displayed_typicals = tuple(
+            route.comparison_pedestrian_flow.typical_movements_per_minute
+            for route in result.routes
+        )
+        assert calmest_typical is not None
+        assert all(value is not None for value in displayed_typicals)
+        assert all(
+            calmest_typical <= value
+            for value in displayed_typicals
+            if value is not None
+        )
 
 
 def test_two_comparable_routes_receive_lowest_and_highest_metadata() -> None:

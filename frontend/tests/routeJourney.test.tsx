@@ -229,6 +229,14 @@ describe("route selection and active navigation journey", () => {
         "CALMEST + FASTEST",
       ),
     ).toBeInTheDocument();
+    const activeSummary = screen.getByRole("region", {
+      name: "Route summary",
+    });
+    expect(within(activeSummary).getByText("13 min")).toBeInTheDocument();
+    expect(within(activeSummary).getByText("1.0 km")).toBeInTheDocument();
+    expect(
+      within(activeSummary).getByText("\u2248 8 movements/min"),
+    ).toBeInTheDocument();
 
     await userEvent.click(
       screen.getByRole("button", { name: "Back to route selection" }),

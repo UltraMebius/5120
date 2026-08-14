@@ -396,7 +396,7 @@ def test_options_api_roles_follow_displayed_typical_activity_and_duration() -> N
     )
 
 
-def test_options_api_serializes_independent_roles_on_one_original_route() -> None:
+def test_options_api_serializes_overlap_and_remaining_balanced_route() -> None:
     response, _, _ = _post(
         [
             _candidate(0, duration=780, live_median=8, live_p75=8),
@@ -412,7 +412,7 @@ def test_options_api_serializes_independent_roles_on_one_original_route() -> Non
     multi_role = next(
         route for route in routes if route["routeId"] == "route-0"
     )
-    assert multi_role["roleBadges"] == ["CALMEST", "FASTEST", "BALANCED"]
+    assert multi_role["roleBadges"] == ["CALMEST", "FASTEST"]
     assert multi_role["durationSeconds"] == min(
         route["durationSeconds"] for route in routes
     )
@@ -424,6 +424,12 @@ def test_options_api_serializes_independent_roles_on_one_original_route() -> Non
         for route in routes
         if route["routeId"] != multi_role["routeId"]
     )
+    balanced = next(
+        route for route in routes if "BALANCED" in route["roleBadges"]
+    )
+    assert balanced["routeId"] == "route-1"
+    assert routes[-1]["routeId"] == "route-2"
+    assert routes[-1]["roleBadges"] == []
     assert multi_role["geometry"]["coordinates"] == [
         [144.963, -37.813],
         [144.965, -37.815],

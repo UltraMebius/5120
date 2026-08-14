@@ -70,6 +70,11 @@ The selector compares candidates only on a common basis:
 It never mixes one route's live evidence with another route's historical
 evidence in the same comparison.
 
+If no common basis qualifies because a candidate lacks a usable numeric
+median, the comparison basis is `UNKNOWN`: displayed typical activity is null,
+`CALMEST` and `BALANCED` are not fabricated, and global `FASTEST` is still
+assigned by exact duration. Missing crowd data is never interpreted as zero.
+
 ### FASTEST
 
 `FASTEST` is always the global minimum lexicographic key across all candidate
@@ -80,10 +85,10 @@ routes:
 3. source index;
 4. route ID.
 
-This role is always assigned and is independent of the other roles. If the
-overall shortest route is also the lowest displayed-flow route, that same
-route is both `FASTEST` and `CALMEST`; a slower route is never relabelled as
-`FASTEST` to make the role IDs distinct.
+This role is always assigned and is independent of `CALMEST`. If the overall
+shortest route is also the lowest displayed-flow route, that same route is
+both `FASTEST` and `CALMEST`; a slower route is never relabelled as `FASTEST`
+to make the absolute role IDs distinct.
 
 ### CALMEST
 
@@ -101,26 +106,33 @@ frontend. The minimum lexicographic key wins:
 
 ### BALANCED
 
-`BALANCED` requires at least three candidates and a non-unknown common basis.
-Duration and displayed median/typical flow are independently min-max
-normalised across the candidate set. Each route receives:
+`BALANCED` requires a non-unknown common basis and at least one eligible route
+remaining after the `CALMEST` and `FASTEST` route IDs are excluded. Duration
+and displayed median/typical flow are independently min-max normalised across
+the full comparable candidate set. Each route receives:
 
 ```text
 balanced score = 0.5 * normalised duration + 0.5 * normalised typical flow
 ```
 
-All candidates remain eligible, including a route already labelled `CALMEST`
-or `FASTEST`. The route with the lowest key is selected by balanced score,
-typical flow, duration, distance, source index, then route ID. Consequently,
-one route may carry `BALANCED` together with either or both other roles.
+Selection then considers only remaining route IDs. The remaining route with
+the lowest key is selected by balanced score, typical flow, duration,
+distance, source index, then route ID. Thus a normal three-route response with
+different `CALMEST` and `FASTEST` owners assigns `BALANCED` to the third route.
+When one route is both `CALMEST` and `FASTEST`, `BALANCED` is the best of the
+other routes. With two comparable routes, `BALANCED` is assigned only when one
+route owns both absolute roles and the other route therefore remains. It is
+never fabricated for a single route or for two different absolute-role
+owners.
 
 ### Response order and relative activity
 
 Unique routes are returned by role order `CALMEST`, `FASTEST`, `BALANCED`,
-followed by any remaining candidates in fastest-key order. Roles are attached
-independently to their winning route IDs. When multiple roles select the same
-route, that original route is returned once with multiple badges; it is not
-duplicated or detached from its geometry, metrics, or navigation steps.
+followed by any remaining candidates in fastest-key order. `CALMEST` and
+`FASTEST` may attach to the same winning route ID. That original route is
+returned once with both badges; it is not duplicated or detached from its
+geometry, metrics, or navigation steps. `BALANCED` uses a distinct remaining
+route whenever one is eligible.
 
 When at least two routes share usable evidence, relative pedestrian activity is
 assigned from the same displayed-median ordering as `LOWEST`, `MIDDLE`, and

@@ -201,19 +201,22 @@ number of people.
 
 ## Route Ranking
 
-The active route-options contract assigns independent characteristics to the
+The active route-options contract assigns semantic characteristics to the
 original route IDs:
 
 - `CALMEST` to the lowest common-source median shown as typical movements/min,
   then P75, maximum, duration, distance, source index, and route ID ties;
 - `FASTEST` to the global minimum exact duration, then distance, source index,
   and route ID ties;
-- `BALANCED` to the minimum equal-weight normalised duration and displayed
-  median-flow score when at least three candidates are eligible.
+- `BALANCED` to the best remaining route, after excluding the `CALMEST` and
+  `FASTEST` route IDs, using an equal-weight normalised duration and displayed
+  median-flow score.
 
-The roles are independent, so one route can carry multiple badges and still
-appears as one card with its original geometry and navigation data. With an
-unknown comparison basis, only overall `FASTEST` is assigned.
+`CALMEST` and `FASTEST` are absolute properties and may belong to the same
+route. `BALANCED` remains a distinct practical trade-off whenever another
+eligible route exists. Every route still appears once with its original
+geometry and navigation data. With an unknown comparison basis, only overall
+`FASTEST` is assigned.
 
 The preference-aware walking contract applies a 55% numeric coverage gate,
 then orders evaluable routes by No Data percentage, percentage above the

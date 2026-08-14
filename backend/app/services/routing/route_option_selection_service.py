@@ -133,7 +133,7 @@ def _optional_number_key(value: float | None) -> tuple[bool, float]:
 
 
 class RouteOptionSelectionService:
-    """Assign independent product roles from values shown by the active UI."""
+    """Assign absolute roles plus a distinct remaining trade-off role."""
 
     def __init__(
         self,
@@ -357,22 +357,31 @@ class RouteOptionSelectionService:
 
         balanced_scores: dict[str, float] = {}
         if (
-            len(candidates) >= 3
+            len(candidates) >= 2
+            and calmest is not None
             and basis is not PedestrianFlowComparisonBasis.UNKNOWN
         ):
-            balanced_scores = self._balanced_scores(candidates, basis)
-            balanced = min(
-                candidates,
-                key=lambda candidate: (
-                    balanced_scores[candidate.route_id],
-                    self._required_typical(candidate, basis),
-                    candidate.duration_seconds,
-                    candidate.distance_meters,
-                    candidate.source_index,
-                    candidate.route_id,
-                ),
+            absolute_role_ids = {calmest.route_id, fastest.route_id}
+            balanced_candidates = tuple(
+                candidate
+                for candidate in candidates
+                if candidate.route_id not in absolute_role_ids
+                and self._qualified(candidate, basis)
             )
-            role_routes[RouteOptionRole.BALANCED] = balanced
+            if balanced_candidates:
+                balanced_scores = self._balanced_scores(candidates, basis)
+                balanced = min(
+                    balanced_candidates,
+                    key=lambda candidate: (
+                        balanced_scores[candidate.route_id],
+                        self._required_typical(candidate, basis),
+                        candidate.duration_seconds,
+                        candidate.distance_meters,
+                        candidate.source_index,
+                        candidate.route_id,
+                    ),
+                )
+                role_routes[RouteOptionRole.BALANCED] = balanced
 
         roles_by_id: dict[str, set[RouteOptionRole]] = {
             candidate.route_id: set() for candidate in candidates
