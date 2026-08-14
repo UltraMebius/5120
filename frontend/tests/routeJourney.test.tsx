@@ -1,29 +1,47 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import {
+  MemoryRouter,
+  Route,
+  Routes,
+  useLocation,
+} from "react-router-dom";
 
 import { JourneyProvider, useJourney } from "../src/context/JourneyContext";
 import ArrivalPage from "../src/pages/ArrivalPage";
 import NavigationPage from "../src/pages/NavigationPage";
-import RouteOptionsPage from "../src/pages/RouteOptionsPage";
 import type { RouteOptionsResponse } from "../src/types/routeOptions";
 import { makeRouteOptionsResponse, SEARCH_REQUEST } from "./fixtures";
 
 vi.mock("../src/components/map/RouteMap", () => ({
-  default: ({
+  default: function MockRouteMap({
+    activeRouteId,
+    mode,
     routes,
-    variant,
   }: {
+    activeRouteId?: string;
+    mode: string;
     routes: { geometry: { coordinates: unknown[] }; routeId: string }[];
-    variant: string;
-  }) => (
-    <div data-testid={`route-map-${variant}`}>
-      {variant}:{routes.map((route) => route.routeId).join(",")}:
-      {routes.map((route) => route.geometry.coordinates.length).join(",")}
-    </div>
-  ),
+  }) {
+    const activeRoute = routes.find(
+      (route) => route.routeId === activeRouteId,
+    );
+    return (
+      <div
+        data-active-geometry={JSON.stringify(
+          activeRoute?.geometry.coordinates ?? [],
+        )}
+        data-map-mode={mode}
+        data-testid="route-map"
+      >
+        {mode}:{activeRouteId ?? "none"}:
+        {routes.map((route) => route.routeId).join(",")}:
+        {routes.map((route) => route.geometry.coordinates.length).join(",")}
+      </div>
+    );
+  },
 }));
 
 interface JourneySeedProps {
@@ -55,6 +73,10 @@ function SearchMarker() {
   return <div>Safe search page</div>;
 }
 
+function LocationProbe() {
+  return <output data-testid="current-path">{useLocation().pathname}</output>;
+}
+
 function HomeProbe() {
   const journey = useJourney();
   return (
@@ -71,13 +93,15 @@ function renderJourney(
   selectedIndex?: number,
 ) {
   const routedContent = (
-    <Routes>
-      <Route path="/routes/search" element={<SearchMarker />} />
-      <Route path="/routes/options" element={<RouteOptionsPage />} />
-      <Route path="/navigation" element={<NavigationPage />} />
-      <Route path="/arrival" element={<ArrivalPage />} />
-      <Route path="/home" element={<HomeProbe />} />
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/routes/search" element={<SearchMarker />} />
+        <Route path="/navigation" element={<NavigationPage />} />
+        <Route path="/arrival" element={<ArrivalPage />} />
+        <Route path="/home" element={<HomeProbe />} />
+      </Routes>
+      <LocationProbe />
+    </>
   );
 
   return render(
@@ -95,7 +119,7 @@ function renderJourney(
   );
 }
 
-describe("route options and navigation journey", () => {
+describe("route selection and active navigation journey", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn<typeof fetch>());
   });
@@ -108,13 +132,17 @@ describe("route options and navigation journey", () => {
     "renders %i backend route option(s) in order and passes every geometry to the map",
     async (routeCount) => {
       renderJourney(
-        "/routes/options",
+        "/navigation",
         makeRouteOptionsResponse(routeCount),
       );
 
       expect(await screen.findAllByRole("article")).toHaveLength(routeCount);
       expect(screen.getAllByRole("tab")).toHaveLength(routeCount);
-      const map = screen.getByTestId("route-map-options");
+      expect(
+        screen.getByRole("heading", { name: "Choose your walk" }),
+      ).toBeInTheDocument();
+      const map = screen.getByTestId("route-map");
+      expect(map).toHaveAttribute("data-map-mode", "selection");
       expect(map).toHaveTextContent(
         Array.from({ length: routeCount }, (_, index) => `route-${index + 1}`).join(
           ",",
@@ -129,7 +157,7 @@ describe("route options and navigation journey", () => {
   it("shows multiple backend roles, rounded movements, and live source metadata", async () => {
     const response = makeRouteOptionsResponse(1, "LIVE");
     response.routes[0].roleBadges = ["CALMEST", "FASTEST"];
-    renderJourney("/routes/options", response);
+    renderJourney("/navigation", response);
 
     expect(await screen.findByText("CALMEST")).toBeInTheDocument();
     expect(screen.getByText("FASTEST")).toBeInTheDocument();
@@ -141,7 +169,7 @@ describe("route options and navigation journey", () => {
 
   it("distinguishes historical evidence from unavailable/null activity", async () => {
     const { unmount } = renderJourney(
-      "/routes/options",
+      "/navigation",
       makeRouteOptionsResponse(1, "HISTORICAL_ESTIMATE"),
     );
     expect(
@@ -153,7 +181,7 @@ describe("route options and navigation journey", () => {
     unmount();
 
     renderJourney(
-      "/routes/options",
+      "/navigation",
       makeRouteOptionsResponse(1, "UNKNOWN"),
     );
     expect(
@@ -162,46 +190,113 @@ describe("route options and navigation journey", () => {
     expect(screen.queryByText(/≈ 0 movements\/min/)).not.toBeInTheDocument();
   });
 
-  it("selects route B, renders only B in Navigation, and makes no request", async () => {
+  it("confirms route B, activates its navigation details, and makes no request", async () => {
     const response = makeRouteOptionsResponse(2);
     const fetchMock = vi.mocked(fetch);
-    renderJourney("/routes/options", response);
+    renderJourney("/navigation", response);
 
     const selectors = await screen.findAllByRole("tab");
     await userEvent.click(selectors[1]);
+    const map = screen.getByTestId("route-map");
+    const selectionPanel = screen.getByTestId("route-selection-panel");
+    expect(map).toHaveTextContent(
+      "selection:route-2:route-1,route-2",
+    );
+    expect(
+      screen.getByRole("heading", { name: "Choose your walk" }),
+    ).toBeInTheDocument();
     await userEvent.click(
-      screen.getByRole("button", { name: /select balanced route/i }),
+      screen.getByRole("button", { name: /select fastest route/i }),
     );
 
-    expect(
-      await screen.findByText("Instruction for route 2"),
-    ).toBeInTheDocument();
-    expect(screen.getByTestId("route-map-navigation")).toHaveTextContent(
-      "navigation:route-2:3",
+    expect(screen.getByTestId("navigation-page")).toHaveAttribute(
+      "data-navigation-mode",
+      "transition-to-active",
     );
-    expect(screen.getByTestId("route-map-navigation")).not.toHaveTextContent(
-      "route-1",
+    expect(selectionPanel).toBeInTheDocument();
+    expect(selectionPanel).toHaveAttribute("aria-hidden", "true");
+    await waitFor(
+      () =>
+        expect(screen.getByTestId("navigation-page")).toHaveAttribute(
+          "data-navigation-mode",
+          "active",
+        ),
+      { timeout: 1500 },
+    );
+    expect(
+      screen.getByText("Instruction for route 2"),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("route-map")).toBe(map);
+    expect(map).toHaveAttribute("data-map-mode", "active");
+    expect(map).toHaveTextContent(
+      "active:route-2:route-1,route-2:3,3",
+    );
+    expect(
+      screen.queryByRole("heading", { name: "Choose your walk" }),
+    ).not.toBeInTheDocument();
+    expect(selectionPanel).toBeInTheDocument();
+    expect(screen.getByText("Route guidance")).toBeInTheDocument();
+    const routeSummary = screen.getByRole("region", {
+      name: "Route summary",
+    });
+    expect(within(routeSummary).getByText("14 min")).toBeInTheDocument();
+    expect(within(routeSummary).getByText("1.2 km")).toBeInTheDocument();
+    expect(within(routeSummary).getByText("FASTEST")).toBeInTheDocument();
+    expect(screen.getByTestId("current-path")).toHaveTextContent(
+      "/navigation",
     );
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("returns to all preserved options without fetching", async () => {
-    const response = makeRouteOptionsResponse(2);
-    const fetchMock = vi.mocked(fetch);
-    renderJourney("/navigation", response, 1);
+  it("returns from active navigation to selection without leaving /navigation", async () => {
+    renderJourney("/navigation", makeRouteOptionsResponse(2), 1);
+
+    const map = screen.getByTestId("route-map");
+    const selectionPanel = screen.getByTestId("route-selection-panel");
+    expect(map).toHaveAttribute("data-map-mode", "active");
 
     await userEvent.click(
-      await screen.findByRole("button", { name: "Back to route options" }),
+      screen.getByRole("button", { name: "Back to route selection" }),
     );
 
-    expect(await screen.findAllByRole("article")).toHaveLength(2);
-    expect(screen.getByTestId("route-map-options")).toHaveTextContent(
-      "route-1,route-2",
+    expect(screen.getByTestId("navigation-page")).toHaveAttribute(
+      "data-navigation-mode",
+      "transition-to-selection",
     );
+    expect(selectionPanel).toBeInTheDocument();
+    expect(selectionPanel).toHaveAttribute("aria-hidden", "true");
+    await waitFor(
+      () =>
+        expect(screen.getByTestId("navigation-page")).toHaveAttribute(
+          "data-navigation-mode",
+          "selection",
+        ),
+      { timeout: 1500 },
+    );
+
+    expect(screen.getByTestId("route-map")).toBe(map);
+    expect(map).toHaveAttribute("data-map-mode", "selection");
+    expect(map).toHaveTextContent("route-1,route-2");
+    expect(selectionPanel).toHaveAttribute("aria-hidden", "false");
     expect(screen.getAllByRole("tab")[1]).toHaveAttribute(
       "aria-selected",
       "true",
     );
+    expect(screen.getByTestId("current-path")).toHaveTextContent(
+      "/navigation",
+    );
+  });
+
+  it("Edit search returns to Search without fetching", async () => {
+    const response = makeRouteOptionsResponse(2);
+    const fetchMock = vi.mocked(fetch);
+    renderJourney("/navigation", response);
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Edit search" }),
+    );
+
+    expect(await screen.findByText("Safe search page")).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -228,7 +323,7 @@ describe("route options and navigation journey", () => {
   });
 
   it("keeps all three semantic route selectors discoverable", async () => {
-    renderJourney("/routes/options", makeRouteOptionsResponse(3));
+    renderJourney("/navigation", makeRouteOptionsResponse(3));
 
     const articles = await screen.findAllByRole("article");
     expect(articles).toHaveLength(3);
@@ -261,9 +356,81 @@ describe("route options and navigation journey", () => {
     ).toBeInTheDocument();
   });
 
+  it("keeps role classifications consistent with displayed activity and duration", async () => {
+    const routes = makeRouteOptionsResponse(3).routes;
+    const calmest = routes.find((route) => route.roleBadges.includes("CALMEST"))!;
+    const balanced = routes.find((route) =>
+      route.roleBadges.includes("BALANCED"),
+    )!;
+    const fastest = routes.find((route) => route.roleBadges.includes("FASTEST"))!;
+
+    expect(calmest.typicalPedestrianMovementsPerMinute!).toBeLessThanOrEqual(
+      balanced.typicalPedestrianMovementsPerMinute!,
+    );
+    expect(calmest.typicalPedestrianMovementsPerMinute!).toBeLessThanOrEqual(
+      fastest.typicalPedestrianMovementsPerMinute!,
+    );
+    expect(fastest.durationSeconds).toBe(
+      Math.min(...routes.map((route) => route.durationSeconds)),
+    );
+  });
+
+  it.each([
+    ["CALMEST", 0],
+    ["BALANCED", 1],
+    ["FASTEST", 2],
+  ] as const)(
+    "selecting the %s card preserves its route ID, geometry, and navigation details",
+    async (role, routeIndex) => {
+      vi.stubGlobal(
+        "matchMedia",
+        vi.fn(() => ({ matches: true })),
+      );
+      const response = makeRouteOptionsResponse(3);
+      const selectedRoute = response.routes[routeIndex];
+      renderJourney("/navigation", response);
+
+      await userEvent.click((await screen.findAllByRole("tab"))[routeIndex]);
+      const map = screen.getByTestId("route-map");
+      expect(map).toHaveTextContent(`selection:${selectedRoute.routeId}`);
+      expect(map).toHaveAttribute(
+        "data-active-geometry",
+        JSON.stringify(selectedRoute.geometry.coordinates),
+      );
+
+      await userEvent.click(
+        screen.getByRole("button", {
+          name: new RegExp(`select ${role.toLowerCase()} route`, "i"),
+        }),
+      );
+      await waitFor(() =>
+        expect(screen.getByTestId("navigation-page")).toHaveAttribute(
+          "data-navigation-mode",
+          "active",
+        ),
+      );
+
+      expect(map).toHaveTextContent(`active:${selectedRoute.routeId}`);
+      expect(map).toHaveAttribute(
+        "data-active-geometry",
+        JSON.stringify(selectedRoute.geometry.coordinates),
+      );
+      expect(
+        within(
+          screen.getByRole("region", { name: "Next walking direction" }),
+        ).getByText(selectedRoute.steps[0].instruction),
+      ).toBeInTheDocument();
+      expect(
+        within(screen.getByRole("region", { name: "Route summary" })).getByText(
+          role,
+        ),
+      ).toBeInTheDocument();
+    },
+  );
+
   it("changes active route details from each selector without fetching", async () => {
     const fetchMock = vi.mocked(fetch);
-    renderJourney("/routes/options", makeRouteOptionsResponse(3));
+    renderJourney("/navigation", makeRouteOptionsResponse(3));
 
     const selectors = await screen.findAllByRole("tab");
     const activeDetail = screen.getByRole("tabpanel");
@@ -272,6 +439,9 @@ describe("route options and navigation journey", () => {
 
     await userEvent.click(selectors[1]);
     expect(selectors[1]).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("route-map")).toHaveTextContent(
+      "selection:route-2:route-1,route-2,route-3",
+    );
     expect(within(activeDetail).getByText("BALANCED")).toBeInTheDocument();
     expect(within(activeDetail).getByText("≈ 11 movements/min")).toBeInTheDocument();
 
@@ -285,13 +455,13 @@ describe("route options and navigation journey", () => {
   it("preserves explicit zero while keeping missing activity unavailable", async () => {
     const zeroResponse = makeRouteOptionsResponse(1, "LIVE");
     zeroResponse.routes[0].typicalPedestrianMovementsPerMinute = 0;
-    const { unmount } = renderJourney("/routes/options", zeroResponse);
+    const { unmount } = renderJourney("/navigation", zeroResponse);
     expect(
       (await screen.findAllByText("≈ 0 movements/min")).length,
     ).toBeGreaterThan(0);
     unmount();
 
-    renderJourney("/routes/options", makeRouteOptionsResponse(1, "UNKNOWN"));
+    renderJourney("/navigation", makeRouteOptionsResponse(1, "UNKNOWN"));
     expect(
       await screen.findAllByText("Pedestrian data unavailable"),
     ).not.toHaveLength(0);
@@ -315,7 +485,7 @@ describe("route options and navigation journey", () => {
     ).toBeInTheDocument();
   });
 
-  it.each(["/routes/options", "/navigation", "/arrival"])(
+  it.each(["/navigation", "/arrival"])(
     "redirects unsafe direct access to %s back to Search",
     async (path) => {
       renderJourney(path);

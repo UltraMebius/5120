@@ -4,7 +4,6 @@ import { APP_CONFIG } from "./config";
 import ArrivalPage from "./pages/ArrivalPage";
 import HomePage from "./pages/HomePage";
 import NavigationPage from "./pages/NavigationPage";
-import RouteOptionsPage from "./pages/RouteOptionsPage";
 import RouteSearchPage from "./pages/RouteSearchPage";
 
 function App() {
@@ -12,7 +11,6 @@ function App() {
     <Routes>
       <Route path="/" element={<Navigate to={APP_CONFIG.homeRoute} replace />} />
       <Route path="/routes/search" element={<RouteSearchPage />} />
-      <Route path="/routes/options" element={<RouteOptionsPage />} />
       <Route path="/navigation" element={<NavigationPage />} />
       <Route path="/arrival" element={<ArrivalPage />} />
       <Route path={APP_CONFIG.homeRoute} element={<HomePage />} />

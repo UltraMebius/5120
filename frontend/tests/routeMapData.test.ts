@@ -60,4 +60,25 @@ describe("route map data", () => {
       { isActive: 0, sortOrder: 2 },
     ]);
   });
+
+  it("keeps all route features while focusing active camera bounds on the confirmed route", () => {
+    const routes = makeRouteOptionsResponse(3).routes;
+    const result = createRouteMapVisualisation(
+      SEARCH_REQUEST.origin,
+      SEARCH_REQUEST.destination,
+      routes,
+      routes[1].routeId,
+      "active",
+    );
+
+    expect(result?.featureCollection.features).toHaveLength(3);
+    expect(
+      result?.featureCollection.features.map(
+        (feature) => feature.properties.opacity,
+      ),
+    ).toEqual([0, 1, 0]);
+    expect(result?.coordinates).toEqual(routes[1].geometry.coordinates);
+    expect(result?.fitKey).toContain("active");
+    expect(result?.fitKey).toContain(routes[1].routeId);
+  });
 });

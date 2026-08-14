@@ -34,7 +34,7 @@ vi.mock("../src/components/route/RouteSearchForm", () => ({
   ),
 }));
 
-function OptionsProbe() {
+function NavigationProbe() {
   const journey = useJourney();
   return (
     <div>
@@ -49,7 +49,7 @@ function renderSearchPage() {
       <JourneyProvider>
         <Routes>
           <Route path="/routes/search" element={<RouteSearchPage />} />
-          <Route path="/routes/options" element={<OptionsProbe />} />
+          <Route path="/navigation" element={<NavigationProbe />} />
         </Routes>
       </JourneyProvider>
     </MemoryRouter>,
@@ -66,7 +66,7 @@ describe("RouteSearchPage", () => {
     vi.unstubAllGlobals();
   });
 
-  it("makes one request, stores the response, and navigates to options", async () => {
+  it("makes one request, stores the response, and navigates directly to Navigation", async () => {
     const response = makeRouteOptionsResponse(3);
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(JSON.stringify(response), {

@@ -59,6 +59,7 @@ def _candidate(
     *,
     duration: float,
     live_coverage: float = 100,
+    live_median: float | None = None,
     live_p75: float | None = None,
     historical_coverage: float = 100,
     historical_p75: float | None = None,
@@ -67,6 +68,9 @@ def _candidate(
     historical_p75 = (
         float(30 + index) if historical_p75 is None else historical_p75
     )
+    resolved_live_median = (
+        float(live_p75) - 2 if live_median is None else live_median
+    )
     summary = RoutePedestrianFlowSummary(
         route_index=index,
         total_sample_count=10,
@@ -74,9 +78,7 @@ def _candidate(
         historical_numeric_sample_count=round(historical_coverage / 10),
         live_coverage_pct=live_coverage,
         historical_coverage_pct=historical_coverage,
-        live_median_pedestrian_movements_per_minute=(
-            None if live_p75 is None else live_p75 - 2
-        ),
+        live_median_pedestrian_movements_per_minute=resolved_live_median,
         live_p75_pedestrian_movements_per_minute=live_p75,
         live_maximum_pedestrian_movements_per_minute=(
             None if live_p75 is None else live_p75 + 5
@@ -306,6 +308,56 @@ def test_options_api_serializes_role_and_response_priority_order() -> None:
     ]
     assert routes[2]["balancedScore"] == pytest.approx(
         0.5 * (180 / 420) + 0.5 * (20 / 45)
+    )
+
+
+def test_options_api_roles_follow_displayed_typical_activity_and_duration() -> None:
+    response, _, _ = _post(
+        [
+            _candidate(
+                0,
+                duration=700,
+                live_median=10,
+                live_p75=12,
+            ),
+            _candidate(
+                1,
+                duration=600,
+                live_median=14,
+                live_p75=14,
+            ),
+            _candidate(
+                2,
+                duration=800,
+                live_median=9,
+                live_p75=15,
+            ),
+        ]
+    )
+
+    assert response.status_code == 200
+    routes = response.json()["routes"]
+    by_role = {
+        route["roleBadges"][0]: route
+        for route in routes
+    }
+
+    assert by_role["CALMEST"]["routeId"] == "route-2"
+    assert by_role["FASTEST"]["routeId"] == "route-1"
+    assert by_role["BALANCED"]["routeId"] == "route-0"
+    assert by_role["CALMEST"]["relativePedestrianActivity"] == "LOWEST"
+    assert by_role["BALANCED"]["relativePedestrianActivity"] == "MIDDLE"
+    assert by_role["FASTEST"]["relativePedestrianActivity"] == "HIGHEST"
+    assert (
+        by_role["CALMEST"]["typicalPedestrianMovementsPerMinute"]
+        <= by_role["BALANCED"]["typicalPedestrianMovementsPerMinute"]
+    )
+    assert (
+        by_role["CALMEST"]["typicalPedestrianMovementsPerMinute"]
+        <= by_role["FASTEST"]["typicalPedestrianMovementsPerMinute"]
+    )
+    assert by_role["FASTEST"]["durationSeconds"] == min(
+        route["durationSeconds"] for route in routes
     )
 
 

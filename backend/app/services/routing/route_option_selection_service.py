@@ -2,7 +2,6 @@
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from decimal import Decimal
 from enum import Enum
 import logging
 import math
@@ -45,12 +44,6 @@ ROLE_BADGE_ORDER = (
     RouteOptionRole.FASTEST,
     RouteOptionRole.BALANCED,
 )
-
-# The UI rounds its median/typical value to whole movements per minute. Five
-# hundredths is therefore well below display resolution while still preventing
-# tiny full-precision P75 differences from defeating the existing median tie.
-P75_PRACTICAL_EQUALITY_TOLERANCE_MPM = 0.05
-
 
 class RouteOptionSelectionError(RuntimeError):
     """Candidate evidence cannot be compared or assigned safely."""
@@ -139,16 +132,8 @@ def _optional_number_key(value: float | None) -> tuple[bool, float]:
     return value is None, math.inf if value is None else value
 
 
-def _p75_effectively_equal(left: float, right: float) -> bool:
-    """Compare finite P75 values with inclusive decimal boundary semantics."""
-
-    difference = abs(Decimal(str(left)) - Decimal(str(right)))
-    tolerance = Decimal(str(P75_PRACTICAL_EQUALITY_TOLERANCE_MPM))
-    return difference <= tolerance
-
-
 class RouteOptionSelectionService:
-    """Assign FASTEST and defensible flow roles without I/O or resampling."""
+    """Assign distinct product roles from the values shown by the active UI."""
 
     def __init__(
         self,
@@ -166,11 +151,11 @@ class RouteOptionSelectionService:
         candidate: RouteCandidate,
         basis: PedestrianFlowComparisonBasis,
     ) -> bool:
-        _, p75, _, coverage = _basis_values(candidate, basis)
+        typical, _, _, coverage = _basis_values(candidate, basis)
         return (
             coverage is not None
             and coverage >= self.minimum_coverage_pct
-            and p75 is not None
+            and typical is not None
         )
 
     def _comparison_basis(
@@ -202,25 +187,38 @@ class RouteOptionSelectionService:
         )
 
     @staticmethod
-    def _required_p75(
+    def _required_typical(
         candidate: RouteCandidate,
         basis: PedestrianFlowComparisonBasis,
     ) -> float:
-        _, p75, _, _ = _basis_values(candidate, basis)
-        if p75 is None:
+        typical, _, _, _ = _basis_values(candidate, basis)
+        if typical is None:
             raise RouteOptionSelectionError(
-                "calmest selection requires a qualified common P75"
+                "route-role selection requires a qualified common typical flow"
             )
-        return p75
+        return typical
 
     @staticmethod
-    def _calmest_secondary_key(
+    def _calmest_key(
         candidate: RouteCandidate,
         basis: PedestrianFlowComparisonBasis,
-    ) -> tuple[tuple[bool, float], tuple[bool, float], float, float, int, str]:
-        median, _, maximum, _ = _basis_values(candidate, basis)
+    ) -> tuple[
+        float,
+        tuple[bool, float],
+        tuple[bool, float],
+        float,
+        float,
+        int,
+        str,
+    ]:
+        typical, p75, maximum, _ = _basis_values(candidate, basis)
+        if typical is None:
+            raise RouteOptionSelectionError(
+                "calmest selection requires a qualified common typical flow"
+            )
         return (
-            _optional_number_key(median),
+            typical,
+            _optional_number_key(p75),
             _optional_number_key(maximum),
             candidate.duration_seconds,
             candidate.distance_meters,
@@ -234,39 +232,14 @@ class RouteOptionSelectionService:
         candidates: Sequence[RouteCandidate],
         basis: PedestrianFlowComparisonBasis,
     ) -> tuple[RouteCandidate, ...]:
-        """Order deterministic practical-P75 groups from calmest upward."""
+        """Order candidates by the median/typical value displayed in the UI."""
 
-        remaining = list(candidates)
-        ordered: list[RouteCandidate] = []
-        while remaining:
-            minimum_p75 = min(
-                cls._required_p75(candidate, basis)
-                for candidate in remaining
+        return tuple(
+            sorted(
+                candidates,
+                key=lambda candidate: cls._calmest_key(candidate, basis),
             )
-            effective_ties = [
-                candidate
-                for candidate in remaining
-                if _p75_effectively_equal(
-                    cls._required_p75(candidate, basis),
-                    minimum_p75,
-                )
-            ]
-            effective_ties.sort(
-                key=lambda candidate: cls._calmest_secondary_key(
-                    candidate,
-                    basis,
-                )
-            )
-            ordered.extend(effective_ties)
-            selected_ids = {
-                candidate.route_id for candidate in effective_ties
-            }
-            remaining = [
-                candidate
-                for candidate in remaining
-                if candidate.route_id not in selected_ids
-            ]
-        return tuple(ordered)
+        )
 
     @staticmethod
     def _normalized(
@@ -284,16 +257,16 @@ class RouteOptionSelectionService:
         basis: PedestrianFlowComparisonBasis,
     ) -> dict[str, float]:
         durations = tuple(candidate.duration_seconds for candidate in candidates)
-        crowd_scores: list[float] = []
+        displayed_crowd_values: list[float] = []
         for candidate in candidates:
-            _, p75, _, _ = _basis_values(candidate, basis)
-            if p75 is None:
-                raise RouteOptionSelectionError(
-                    "balanced selection requires a qualified common P75"
-                )
-            crowd_scores.append(p75)
+            displayed_crowd_values.append(
+                self._required_typical(candidate, basis)
+            )
         minimum_duration, maximum_duration = min(durations), max(durations)
-        minimum_crowd, maximum_crowd = min(crowd_scores), max(crowd_scores)
+        minimum_crowd, maximum_crowd = (
+            min(displayed_crowd_values),
+            max(displayed_crowd_values),
+        )
         return {
             candidate.route_id: (
                 0.5
@@ -309,7 +282,10 @@ class RouteOptionSelectionService:
                     maximum_crowd,
                 )
             )
-            for candidate, crowd_score in zip(candidates, crowd_scores)
+            for candidate, crowd_score in zip(
+                candidates,
+                displayed_crowd_values,
+            )
         }
 
     def _relative_activity(
@@ -367,17 +343,28 @@ class RouteOptionSelectionService:
             _summary(candidate)
 
         basis = self._comparison_basis(candidates)
-        fastest = min(candidates, key=self._fastest_key)
-        role_routes: dict[RouteOptionRole, RouteCandidate] = {
-            RouteOptionRole.FASTEST: fastest
-        }
+        role_routes: dict[RouteOptionRole, RouteCandidate] = {}
         calmest: RouteCandidate | None = None
-        if len(candidates) >= 2 and basis is not PedestrianFlowComparisonBasis.UNKNOWN:
+        if (
+            len(candidates) >= 2
+            and basis is not PedestrianFlowComparisonBasis.UNKNOWN
+        ):
             calmest = self._calmest_order(candidates, basis)[0]
             role_routes[RouteOptionRole.CALMEST] = calmest
 
+        fastest_candidates = tuple(
+            candidate
+            for candidate in candidates
+            if calmest is None or candidate.route_id != calmest.route_id
+        )
+        fastest = min(fastest_candidates, key=self._fastest_key)
+        role_routes[RouteOptionRole.FASTEST] = fastest
+
         balanced_scores: dict[str, float] = {}
-        if len(candidates) >= 3 and basis is not PedestrianFlowComparisonBasis.UNKNOWN:
+        if (
+            len(candidates) >= 3
+            and basis is not PedestrianFlowComparisonBasis.UNKNOWN
+        ):
             balanced_scores = self._balanced_scores(candidates, basis)
             excluded_ids = {fastest.route_id}
             if calmest is not None:
@@ -391,7 +378,7 @@ class RouteOptionSelectionService:
                 eligible,
                 key=lambda candidate: (
                     balanced_scores[candidate.route_id],
-                    self._required_p75(candidate, basis),
+                    self._required_typical(candidate, basis),
                     candidate.duration_seconds,
                     candidate.distance_meters,
                     candidate.source_index,

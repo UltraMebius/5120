@@ -20,7 +20,7 @@ function RouteSearchPage() {
     try {
       const result = await fetchRouteOptions(request);
       journey.setRouteOptions(request, result);
-      navigate("/routes/options");
+      navigate("/navigation");
     } catch (requestError: unknown) {
       console.error("Unable to load route options.");
       setError(

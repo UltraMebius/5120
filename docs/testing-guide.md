@@ -93,8 +93,8 @@ npm test
 
 This runs the test TypeScript configuration and Vitest once. Current coverage
 includes API parsing, search validation/loading/errors, route-option semantics,
-one/two/three-route behavior, map feature data, selected-route navigation,
-arrival, guards, and no-refetch behavior.
+one/two/three-route behavior, the Navigation selection overlay, map feature
+data, confirmed-route navigation, arrival, guards, and no-refetch behavior.
 
 ## Frontend production build
 
@@ -191,13 +191,14 @@ by `tests/test_internal_refresh_api.py`.
 4. Search a Melbourne origin/destination and confirm one to three returned
    routes show role, movements/min or unavailable wording, duration, distance,
    and textual relative activity.
-5. Verify all returned geometries appear on Route Options.
-6. Select each option and confirm the active detail changes without a new route
-   request.
-7. Start Navigation and confirm only the exact selected route and a real
-   backend instruction appear.
-8. Return to options and verify context reuse, then finish/exit and verify
-   journey reset.
+5. Verify Navigation opens in route-selection mode and all returned geometries
+   appear behind the floating selection panel.
+6. Focus each option and confirm its detail and map emphasis change without a
+   new route request.
+7. Select a route and confirm the same `/navigation` page switches to Active
+   Navigation with only the exact selected route and a real backend instruction.
+8. Verify Edit search before confirmation, then finish/exit after confirmation
+   and verify journey reset.
 9. Repeat at desktop and mobile viewports and with one-, two-, and three-route
    controlled responses.
 

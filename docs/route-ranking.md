@@ -62,9 +62,9 @@ The default minimum usable coverage is
 The selector compares candidates only on a common basis:
 
 1. `LIVE` when every candidate has at least 55% live coverage and a numeric
-   live P75;
+   live median/typical value;
 2. otherwise `HISTORICAL_ESTIMATE` when every candidate has at least 55%
-   historical coverage and a numeric historical P75;
+   historical coverage and a numeric historical median/typical value;
 3. otherwise `UNKNOWN`.
 
 It never mixes one route's live evidence with another route's historical
@@ -72,56 +72,60 @@ evidence in the same comparison.
 
 ### FASTEST
 
-`FASTEST` is the minimum lexicographic key:
+When no common crowd basis exists, `FASTEST` is the minimum lexicographic key:
 
 1. duration;
 2. distance;
 3. source index;
 4. route ID.
 
-This role is always assigned, including when the comparison basis is unknown.
+This role is always assigned. With a usable comparison basis, `CALMEST` is
+reserved first and `FASTEST` uses the same key over the remaining candidates.
+This keeps role IDs distinct. If the overall shortest route is also the lowest
+displayed-flow route, it remains `CALMEST` and the shortest remaining route is
+`FASTEST`.
 
 ### CALMEST
 
-`CALMEST` requires at least two candidates and a non-unknown common basis.
-Candidates are grouped by the lowest P75. P75 values within an inclusive
-`0.05 movements/min` tolerance are treated as practically equal because that
-difference is below the UI's whole-number display resolution.
+`CALMEST` requires at least two candidates and a non-unknown common basis. It
+uses the exact median/typical movements-per-minute value displayed by the
+frontend. The minimum lexicographic key wins:
 
-Within a practical P75 tie, the lower key wins:
-
-1. median, with missing last;
-2. maximum, with missing last;
-3. duration;
-4. distance;
-5. source index;
-6. route ID.
+1. median/typical movements per minute;
+2. P75, with missing last;
+3. maximum, with missing last;
+4. duration;
+5. distance;
+6. source index;
+7. route ID.
 
 ### BALANCED
 
 `BALANCED` requires at least three candidates and a non-unknown common basis.
-Duration and P75 are independently min-max normalised across the candidate
-set. Each route receives:
+Duration and displayed median/typical flow are independently min-max
+normalised across the candidate set. Each route receives:
 
 ```text
-balanced score = 0.5 * normalised duration + 0.5 * normalised P75 flow
+balanced score = 0.5 * normalised duration + 0.5 * normalised typical flow
 ```
 
-The already selected fastest and calmest routes are excluded. The remaining
-route with the lowest key is selected by balanced score, P75, duration,
-distance, source index, then route ID.
+The already selected calmest and fastest routes are excluded. The remaining
+route with the lowest key is selected by balanced score, typical flow,
+duration, distance, source index, then route ID. The active candidate generator
+returns at most three routes, so a three-route response assigns `BALANCED` to
+the one remaining route.
 
 ### Response order and relative activity
 
-Unique routes are returned by first occurrence in role order
-`CALMEST`, `FASTEST`, `BALANCED`, followed by any remaining candidates in
-fastest-key order. One route may hold multiple role badges.
+Unique routes are returned by role order `CALMEST`, `FASTEST`, `BALANCED`,
+followed by any remaining candidates in fastest-key order. With a usable
+comparison basis, each role is attached to a distinct route ID.
 
 When at least two routes share usable evidence, relative pedestrian activity is
-assigned from the calmest ordering as `LOWEST`, `MIDDLE`, and `HIGHEST`.
-Unknown evidence or a single route produces `UNKNOWN`. The frontend's semantic
-green/orange/red/grey accents use this relative activity value, not the role
-name.
+assigned from the same displayed-median ordering as `LOWEST`, `MIDDLE`, and
+`HIGHEST`. Unknown evidence or a single route produces `UNKNOWN`. The
+frontend's semantic green/orange/red/grey accents use this relative activity
+value, not the role name.
 
 ## Preference-aware Crowd Exposure ranking
 

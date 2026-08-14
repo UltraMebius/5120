@@ -46,7 +46,7 @@ impact.
 The active frontend flow is:
 
 ```text
-Home -> Route Search -> Route Options -> Navigation -> Arrival -> Home
+Home -> Route Search -> Navigation (route selection overlay) -> Active Navigation -> Arrival -> Home
 ```
 
 The active frontend calls `POST /api/v1/routes/options`. It presents up to three
@@ -105,7 +105,7 @@ criterion-by-criterion status.
 - recent 15-minute sensor estimates with historical typical-flow fallback;
 - deterministic `CALMEST`, `FASTEST`, and `BALANCED` role assignment;
 - honest unavailable states when candidates lack a common evidence basis;
-- map fitting for all options and selected-only Navigation geometry;
+- map fitting for all candidates in Navigation selection mode and selected-only Active Navigation geometry;
 - exact selected-route reuse without a route-options refetch;
 - backend-provided static route guidance and one-screen arrival/reset flow;
 - separate tested P75 preference ranking and initial alert backend contract;
@@ -181,9 +181,10 @@ using normalised inverse-distance weighting. Route-level median, continuous
 P75, maximum, and coverage are calculated for each source.
 
 The active route selector uses recent evidence only when every candidate has at
-least 55% coverage and a numeric recent P75. Otherwise it uses historical
-evidence when every candidate qualifies. If neither common basis exists, crowd
-comparison is unavailable rather than mixed or fabricated.
+least 55% coverage and a numeric recent median, which is the typical
+movements/min value shown in the UI. Otherwise it uses historical evidence when
+every candidate qualifies. If neither common basis exists, crowd comparison is
+unavailable rather than mixed or fabricated.
 
 ### Preference-aware Crowd Exposure
 
@@ -200,13 +201,18 @@ number of people.
 
 ## Route Ranking
 
-The active route-options contract assigns:
+The active route-options contract assigns distinct route IDs:
 
-- `FASTEST` by duration, then deterministic ties;
-- `CALMEST` by a common-source P75, with a practical 0.05 movements/min tie and
-  median/maximum/time/distance tie-breaks;
-- `BALANCED` from equal-weight normalised duration and P75 flow when at least
-  three candidates are eligible.
+- `CALMEST` to the lowest common-source median shown as typical movements/min,
+  then P75, maximum, duration, distance, source index, and route ID ties;
+- `FASTEST` by duration and deterministic ties among routes not already
+  reserved as `CALMEST`;
+- `BALANCED` from the remaining routes using equal-weight normalised duration
+  and displayed median flow when at least three candidates are eligible.
+
+If one route is both the overall lowest-flow and shortest candidate,
+`CALMEST` keeps that route and `FASTEST` is the shortest remaining distinct
+route. With an unknown comparison basis, only overall `FASTEST` is assigned.
 
 The preference-aware walking contract applies a 55% numeric coverage gate,
 then orders evaluable routes by No Data percentage, percentage above the
@@ -249,7 +255,7 @@ and limitations.
 |-- frontend/
 |   |-- src/components/      UI, route, crowd, and map components
 |   |-- src/context/         In-memory journey state
-|   |-- src/pages/           Home, Search, Options, Navigation, Arrival
+|   |-- src/pages/           Home, Search, Navigation, Arrival
 |   |-- src/services/        API, Mapbox search, geolocation
 |   `-- tests/               Vitest/Testing Library tests
 |-- handoff/                 Frozen backend/data contract and schema

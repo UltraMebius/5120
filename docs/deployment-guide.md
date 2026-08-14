@@ -150,8 +150,7 @@ Mapbox token, Neon URL, refresh secret, or Vercel credential in one.
 
 After deployment:
 
-1. open and refresh `/home`, `/routes/search`, `/routes/options`, `/navigation`,
-   and `/arrival`;
+1. open and refresh `/home`, `/routes/search`, `/navigation`, and `/arrival`;
 2. confirm no path receives a platform 404 (guard redirects are expected when
    journey context is absent);
 3. select Mapbox suggestions and complete a real route-options request;

@@ -12,7 +12,6 @@ from backend.app.services.routing.route_candidate_models import (
     RouteCandidateSource,
 )
 from backend.app.services.routing.route_option_selection_service import (
-    P75_PRACTICAL_EQUALITY_TOLERANCE_MPM,
     PedestrianFlowComparisonBasis,
     RelativePedestrianActivity,
     RouteOptionRole,
@@ -186,13 +185,13 @@ def test_live_coverage_qualification_boundary(coverage, expected) -> None:
     assert result.comparison_basis is expected
 
 
-def test_numeric_p75_is_required_even_when_live_coverage_is_sufficient() -> None:
+def test_numeric_typical_flow_is_required_when_live_coverage_is_sufficient() -> None:
     first = _candidate("a", 0, duration=600, live_coverage=100)
     first = replace(
         first,
         pedestrian_flow_summary=replace(
             first.pedestrian_flow_summary,
-            live_p75_pedestrian_movements_per_minute=None,
+            live_median_pedestrian_movements_per_minute=None,
         ),
     )
 
@@ -205,9 +204,9 @@ def test_numeric_p75_is_required_even_when_live_coverage_is_sufficient() -> None
 
 def test_fastest_uses_duration_distance_source_index_and_route_id_ties() -> None:
     result = _select(
-        _candidate("z", 4, duration=600, distance=900),
-        _candidate("b", 2, duration=600, distance=800),
-        _candidate("a", 1, duration=600, distance=800),
+        _candidate("z", 4, duration=600, distance=900, live_median=5),
+        _candidate("b", 2, duration=600, distance=800, live_median=20),
+        _candidate("a", 1, duration=600, distance=800, live_median=30),
     )
 
     assert RouteOptionRole.FASTEST in _by_id(result)["a"].role_badges
@@ -215,8 +214,22 @@ def test_fastest_uses_duration_distance_source_index_and_route_id_ties() -> None
 
 def test_fastest_uses_stable_route_id_after_all_numeric_ties() -> None:
     result = _select(
-        _candidate("z", 0, duration=600, distance=900),
-        _candidate("a", 0, duration=600, distance=900),
+        _candidate(
+            "z",
+            0,
+            duration=600,
+            distance=900,
+            live_coverage=80,
+            historical_coverage=20,
+        ),
+        _candidate(
+            "a",
+            0,
+            duration=600,
+            distance=900,
+            live_coverage=20,
+            historical_coverage=80,
+        ),
     )
 
     assert RouteOptionRole.FASTEST in _by_id(result)["a"].role_badges
@@ -229,7 +242,7 @@ def test_one_route_has_fastest_but_no_calmest_or_balanced() -> None:
     assert result.routes[0].balanced_score is None
 
 
-def test_calmest_uses_p75_then_median_maximum_duration_and_distance() -> None:
+def test_calmest_uses_displayed_median_then_p75_maximum_and_route_ties() -> None:
     result = _select(
         _candidate(
             "a",
@@ -263,7 +276,7 @@ def test_calmest_uses_p75_then_median_maximum_duration_and_distance() -> None:
     assert RouteOptionRole.CALMEST in _by_id(result)["c"].role_badges
 
 
-def test_real_live_p75_noise_uses_median_tie_break_for_calmest() -> None:
+def test_observed_live_values_assign_calmest_to_lowest_displayed_median() -> None:
     result = _select(
         _candidate(
             "a",
@@ -298,42 +311,7 @@ def test_real_live_p75_noise_uses_median_tie_break_for_calmest() -> None:
     )
 
 
-@pytest.mark.parametrize(
-    ("higher_p75", "expected_calmest"),
-    [
-        (15.049999, "b"),
-        (15.05, "b"),
-        (15.050001, "a"),
-    ],
-)
-def test_practical_p75_tolerance_boundary_is_inclusive_and_deterministic(
-    higher_p75: float,
-    expected_calmest: str,
-) -> None:
-    assert P75_PRACTICAL_EQUALITY_TOLERANCE_MPM == 0.05
-    result = _select(
-        _candidate(
-            "a",
-            0,
-            duration=600,
-            live_p75=15.0,
-            live_median=10.0,
-        ),
-        _candidate(
-            "b",
-            1,
-            duration=700,
-            live_p75=higher_p75,
-            live_median=8.0,
-        ),
-    )
-
-    assert RouteOptionRole.CALMEST in (
-        _by_id(result)[expected_calmest].role_badges
-    )
-
-
-def test_materially_lower_p75_remains_authoritative_over_median() -> None:
+def test_lower_displayed_median_is_authoritative_over_lower_p75() -> None:
     result = _select(
         _candidate(
             "a",
@@ -351,23 +329,23 @@ def test_materially_lower_p75_remains_authoritative_over_median() -> None:
         ),
     )
 
-    assert RouteOptionRole.CALMEST in _by_id(result)["a"].role_badges
+    assert RouteOptionRole.CALMEST in _by_id(result)["b"].role_badges
 
 
-def test_exact_p75_tie_uses_median() -> None:
+def test_exact_displayed_median_tie_uses_p75() -> None:
     result = _select(
         _candidate(
             "a",
             0,
             duration=600,
             live_p75=15.1,
-            live_median=10.0,
+            live_median=8.0,
         ),
         _candidate(
             "b",
             1,
             duration=700,
-            live_p75=15.1,
+            live_p75=14.1,
             live_median=8.0,
         ),
     )
@@ -375,7 +353,7 @@ def test_exact_p75_tie_uses_median() -> None:
     assert RouteOptionRole.CALMEST in _by_id(result)["b"].role_badges
 
 
-def test_historical_p75_practical_tie_uses_historical_median() -> None:
+def test_historical_comparison_uses_historical_displayed_median() -> None:
     result = _select(
         _candidate(
             "a",
@@ -411,30 +389,28 @@ def test_calmest_uses_source_index_then_route_id_for_final_ties() -> None:
     assert RouteOptionRole.CALMEST in _by_id(result)["a"].role_badges
 
 
-def test_fastest_and_calmest_share_one_route_and_ordered_badges() -> None:
+def test_two_routes_receive_distinct_calmest_and_fastest_roles() -> None:
     result = _select(
-        _candidate("a", 0, duration=600, live_p75=15),
-        _candidate("b", 1, duration=780, live_p75=30),
+        _candidate("a", 0, duration=600, live_median=10, live_p75=15),
+        _candidate("b", 1, duration=780, live_median=20, live_p75=30),
     )
 
     assert [route.candidate.route_id for route in result.routes] == ["a", "b"]
-    assert result.routes[0].role_badges == (
-        RouteOptionRole.CALMEST,
-        RouteOptionRole.FASTEST,
-    )
+    assert result.routes[0].role_badges == (RouteOptionRole.CALMEST,)
+    assert result.routes[1].role_badges == (RouteOptionRole.FASTEST,)
 
 
 def test_three_route_balanced_normalization_and_response_order() -> None:
     result = _select(
-        _candidate("a", 0, duration=600, live_p75=60),
-        _candidate("b", 1, duration=780, live_p75=35),
-        _candidate("c", 2, duration=1_020, live_p75=15),
+        _candidate("a", 0, duration=600, live_median=50, live_p75=60),
+        _candidate("b", 1, duration=780, live_median=30, live_p75=35),
+        _candidate("c", 2, duration=1_020, live_median=10, live_p75=15),
     )
     routes = _by_id(result)
 
     assert routes["a"].balanced_score == pytest.approx(0.5)
     assert routes["b"].balanced_score == pytest.approx(
-        0.5 * (180 / 420) + 0.5 * (20 / 45)
+        0.5 * (180 / 420) + 0.5 * (20 / 40)
     )
     assert routes["c"].balanced_score == pytest.approx(0.5)
     assert routes["b"].role_badges == (RouteOptionRole.BALANCED,)
@@ -496,31 +472,29 @@ def test_equal_duration_and_crowd_ranges_do_not_divide_by_zero() -> None:
     assert [route.balanced_score for route in result.routes] == [0.0, 0.0, 0.0]
 
 
-def test_fastest_equals_calmest_balanced_uses_a_different_route() -> None:
+def test_calmest_fastest_conflict_assigns_three_distinct_routes() -> None:
     result = _select(
-        _candidate("a", 0, duration=600, live_p75=10),
-        _candidate("b", 1, duration=700, live_p75=20),
-        _candidate("c", 2, duration=800, live_p75=30),
+        _candidate("a", 0, duration=600, live_median=10, live_p75=10),
+        _candidate("b", 1, duration=700, live_median=20, live_p75=20),
+        _candidate("c", 2, duration=800, live_median=30, live_p75=30),
     )
     routes = _by_id(result)
 
-    assert routes["a"].role_badges == (
-        RouteOptionRole.CALMEST,
-        RouteOptionRole.FASTEST,
+    assert routes["a"].role_badges == (RouteOptionRole.CALMEST,)
+    assert routes["b"].role_badges == (RouteOptionRole.FASTEST,)
+    assert routes["c"].role_badges == (RouteOptionRole.BALANCED,)
+    assert routes["b"].candidate.duration_seconds == min(
+        route.candidate.duration_seconds
+        for route in routes.values()
+        if route.candidate.route_id != "a"
     )
-    balanced_id = next(
-        route_id
-        for route_id, route in routes.items()
-        if RouteOptionRole.BALANCED in route.role_badges
-    )
-    assert balanced_id != "a"
     assert len({route.candidate.route_id for route in result.routes}) == 3
 
 
 def test_two_comparable_routes_receive_lowest_and_highest_metadata() -> None:
     result = _select(
-        _candidate("high", 0, duration=600, live_p75=40),
-        _candidate("low", 1, duration=700, live_p75=10),
+        _candidate("high", 0, duration=600, live_median=40, live_p75=40),
+        _candidate("low", 1, duration=700, live_median=10, live_p75=10),
     )
 
     assert _by_id(result)["low"].relative_pedestrian_activity is (

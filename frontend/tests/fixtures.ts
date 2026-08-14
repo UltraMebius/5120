@@ -59,7 +59,7 @@ export function makeRouteOption(
       typicalMovementsPerMinute: typical,
     },
     distanceMeters: 1000 + index * 220,
-    durationSeconds: 720 + index * 120,
+    durationSeconds: 960 - index * 120,
     geometry: {
       coordinates: [
         [144.9628, -37.8102],
@@ -112,7 +112,17 @@ export function makeRouteOptionsResponse(
     makeRouteOption(index, comparisonBasis),
   );
 
+  if (routeCount === 1) {
+    routes[0].roleBadges = ["FASTEST"];
+    routes[0].relativePedestrianActivity = "UNKNOWN";
+    routes[0].balancedScore = null;
+  }
+
   if (routeCount === 2 && comparisonBasis !== "UNKNOWN") {
+    routes[0].roleBadges = ["CALMEST"];
+    routes[0].balancedScore = null;
+    routes[1].roleBadges = ["FASTEST"];
+    routes[1].balancedScore = null;
     routes[1].relativePedestrianActivity = "HIGHEST";
   }
 

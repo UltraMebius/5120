@@ -38,7 +38,7 @@ TypeScript, Mapbox GL JS, and browser `fetch`.
 The active page flow is:
 
 ```text
-Home -> Route Search -> Route Options -> Navigation -> Arrival -> Home
+Home -> Route Search -> Navigation (route selection overlay) -> Active Navigation -> Arrival -> Home
 ```
 
 - `LocationSearchField` calls Mapbox Search Box `/suggest` and `/retrieve`
@@ -47,10 +47,12 @@ Home -> Route Search -> Route Options -> Navigation -> Arrival -> Home
 - The browser Geolocation API can provide a one-shot origin. The location is
   held only in React state and is not continuous tracking.
 - `JourneyContext` stores the selected structured locations, returned route
-  options, and exact selected route in memory. It is not persisted across a
-  full browser refresh.
-- `RouteMap` draws only backend-returned GeoJSON. Before selection it draws all
-  returned options; Navigation draws only the selected route.
+  options, and exact confirmed route in memory. A missing confirmed route puts
+  Navigation into route-selection mode. State is not persisted across a full
+  browser refresh.
+- `RouteMap` draws only backend-returned GeoJSON. Navigation selection mode
+  draws all returned options and emphasises the focused candidate; Active
+  Navigation draws only the confirmed route.
 - The active API client calls `POST /api/v1/routes/options`. It never calls
   Mapbox Directions from the browser.
 

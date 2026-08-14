@@ -23,6 +23,7 @@ interface JourneyState {
 }
 
 interface JourneyContextValue extends JourneyState {
+  returnToRouteSelection: () => void;
   resetJourney: () => void;
   selectRoute: (route: RouteOption) => void;
   setDraftLocation: (
@@ -52,6 +53,13 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
   const value = useMemo<JourneyContextValue>(
     () => ({
       ...state,
+      returnToRouteSelection: () => {
+        setState((current) => ({
+          ...current,
+          selectedRoute: null,
+          startedAt: null,
+        }));
+      },
       resetJourney: () => setState(INITIAL_STATE),
       selectRoute: (route) => {
         setState((current) => {

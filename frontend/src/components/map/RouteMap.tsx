@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import mapboxgl from "mapbox-gl";
+import mapboxgl, { type ExpressionSpecification } from "mapbox-gl";
 
 import { MAPBOX_CONFIG, isMapboxConfigured } from "../../services/mapbox";
 import type {
@@ -16,15 +16,15 @@ const DEFAULT_CENTER: [longitude: number, latitude: number] = [
   144.9631, -37.8136,
 ];
 
-type RouteMapVariant = "navigation" | "options";
+type RouteMapMode = "active" | "selection";
 type RouteCoordinate = [longitude: number, latitude: number];
 
 interface RouteMapProps {
   activeRouteId?: string;
   destination: MapboxJourneyLocation | null;
+  mode: RouteMapMode;
   origin: JourneyLocation | null;
   routes: RouteOption[];
-  variant: RouteMapVariant;
 }
 
 interface RouteFeature {
@@ -32,6 +32,7 @@ interface RouteFeature {
   properties: {
     colour: string;
     isActive: number;
+    opacity: number;
     routeId: string;
     sortOrder: number;
   };
@@ -72,6 +73,7 @@ export function createRouteMapVisualisation(
   destination: MapboxJourneyLocation | null,
   routes: RouteOption[],
   activeRouteId?: string,
+  mode: RouteMapMode = "selection",
 ): RouteVisualisation | null {
   const originCoordinate: unknown = origin
     ? [origin.longitude, origin.latitude]
@@ -99,19 +101,35 @@ export function createRouteMapVisualisation(
     properties: {
       colour: ROUTE_ACTIVITY_COLOURS[route.relativePedestrianActivity],
       isActive: route.routeId === activeRouteId ? 1 : 0,
+      opacity:
+        route.routeId === activeRouteId
+          ? 1
+          : mode === "active"
+            ? 0
+            : 0.48,
       routeId: route.routeId,
       sortOrder: index + (route.routeId === activeRouteId ? 100 : 0),
     },
     type: "Feature",
   }));
-  const coordinates = routes.flatMap((route) => route.geometry.coordinates);
+  const selectedCameraRoutes =
+    mode === "active"
+      ? routes.filter((route) => route.routeId === activeRouteId)
+      : routes;
+  const cameraRoutes =
+    selectedCameraRoutes.length > 0 ? selectedCameraRoutes : routes;
+  const coordinates = cameraRoutes.flatMap(
+    (route) => route.geometry.coordinates,
+  );
 
   return {
     coordinates,
     destination: destinationCoordinate,
     featureCollection: { features, type: "FeatureCollection" },
     fitKey: [
-      ...routes.flatMap((route) => [
+      mode,
+      mode === "active" ? activeRouteId : "all-routes",
+      ...cameraRoutes.flatMap((route) => [
         route.routeId,
         route.relativePedestrianActivity,
         ...route.geometry.coordinates.flat(),
@@ -140,12 +158,21 @@ function createMarkerElement(
   return element;
 }
 
+function routeOpacityExpression(mode: RouteMapMode): ExpressionSpecification {
+  return [
+    "case",
+    ["==", ["get", "isActive"], 1],
+    1,
+    mode === "active" ? 0 : 0.48,
+  ];
+}
+
 function RouteMap({
   activeRouteId,
   destination,
+  mode,
   origin,
   routes,
-  variant,
 }: RouteMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -163,8 +190,9 @@ function RouteMap({
         destination,
         routes,
         activeRouteId,
+        mode,
       ),
-    [activeRouteId, destination, origin, routes],
+    [activeRouteId, destination, mode, origin, routes],
   );
 
   useEffect(() => {
@@ -252,12 +280,8 @@ function RouteMap({
           },
           paint: {
             "line-color": ["get", "colour"],
-            "line-opacity": [
-              "case",
-              ["==", ["get", "isActive"], 1],
-              1,
-              0.78,
-            ],
+            "line-opacity": routeOpacityExpression(mode),
+            "line-opacity-transition": { delay: 0, duration: 450 },
             "line-width": [
               "interpolate",
               ["linear"],
@@ -267,10 +291,17 @@ function RouteMap({
               16,
               ["case", ["==", ["get", "isActive"], 1], 10, 7],
             ],
+            "line-width-transition": { delay: 0, duration: 450 },
           },
           source: ROUTE_SOURCE_ID,
           type: "line",
         });
+      } else {
+        map.setPaintProperty(
+          ROUTE_LAYER_ID,
+          "line-opacity",
+          routeOpacityExpression(mode),
+        );
       }
 
       if (!originMarkerRef.current) {
@@ -318,18 +349,33 @@ function RouteMap({
           ),
         );
         const containerWidth = containerRef.current?.clientWidth ?? 0;
+        const containerHeight = containerRef.current?.clientHeight ?? 0;
         const padding =
-          variant === "navigation"
+          mode === "active"
             ? containerWidth < 640
               ? { bottom: 160, left: 34, right: 34, top: 125 }
               : { bottom: 175, left: 64, right: 64, top: 140 }
-            : containerWidth < 640
-              ? 42
-              : 58;
+            : containerWidth < 760
+              ? {
+                  bottom: Math.min(
+                    Math.max(Math.round(containerHeight * 0.55), 280),
+                    480,
+                  ),
+                  left: 34,
+                  right: 34,
+                  top: 54,
+                }
+              : { bottom: 64, left: 430, right: 64, top: 64 };
 
         map.resize();
+        const reduceMotion =
+          typeof window.matchMedia === "function" &&
+          window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        const animateCamera = lastFittedRoutesRef.current !== null;
+
         map.fitBounds(bounds, {
-          duration: 0,
+          duration: animateCamera && !reduceMotion ? 650 : 0,
+          essential: false,
           maxZoom: 16,
           padding,
         });
@@ -340,7 +386,7 @@ function RouteMap({
     } catch {
       setMapError("The walking routes could not be drawn on the map.");
     }
-  }, [destination, origin, styleRevision, variant, visualisation]);
+  }, [destination, mode, origin, styleRevision, visualisation]);
 
   const fallbackMessage = !configured
     ? "The route map is currently unavailable."
@@ -355,11 +401,11 @@ function RouteMap({
   return (
     <section
       aria-label={
-        variant === "navigation"
+        mode === "active"
           ? "Selected walking route map"
           : `Map showing ${routeCountLabel}`
       }
-      className={`route-map route-map--${variant}`}
+      className="route-map route-map--navigation navigation-shared-map"
     >
       <div className="route-map__canvas" ref={containerRef} />
 
